@@ -39,13 +39,16 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAGxdKm-7d6cjFet5hnk2OD5Lu5h6T_7T
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
+# RENDERDA O'CHIB KETMAYDIGAN KANAL MA'LUMOTLARI (SHU YERGA YOZING YOKI ENV ULANING):
+# Format: "KANAL_ID|KANAL_NOMI|LINK"
+# Agar 2 ta bo'lsa vergul bilan: "-100123|Kanal1|link1, -100456|Kanal2|link2"
+CHANNELS_ENV = os.getenv("CHANNELS", "")
+
 PORT = int(os.getenv("PORT", 8080))
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
-
 DATABASE_PATH = "bot_data.db"
 
-# Keshlar
-sub_cache = TTLCache(maxsize=20000, ttl=300)
+sub_cache = TTLCache(maxsize=20000, ttl=60)
 user_cooldown = TTLCache(maxsize=20000, ttl=4)
 
 NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
@@ -86,7 +89,6 @@ class Database:
                     invite_link TEXT NOT NULL
                 )
             """)
-            await db.execute("CREATE INDEX IF NOT EXISTS idx_generations ON users(generations_count DESC);")
             await db.commit()
 
     @staticmethod
@@ -173,9 +175,25 @@ class Database:
 
     @staticmethod
     async def get_channels() -> List[Tuple[int, str, str]]:
+        db_channels = []
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT channel_id, title, invite_link FROM channels") as cursor:
-                return await cursor.fetchall()
+                db_channels = await cursor.fetchall()
+        
+        # Agar ENV faylda kanallar kiritilgan bo'lsa ularni qo'shish
+        env_channels = []
+        if CHANNELS_ENV:
+            try:
+                for item in CHANNELS_ENV.split(","):
+                    parts = item.strip().split("|")
+                    if len(parts) == 3:
+                        env_channels.append((int(parts[0]), parts[1], parts[2]))
+            except Exception as e:
+                logger.error(f"CHANNELS ENV xatosi: {e}")
+
+        # Dublikatlarni tozalash
+        all_channels = {ch[0]: ch for ch in (db_channels + env_channels)}
+        return list(all_channels.values())
 
 
 # ==============================================================================
@@ -214,7 +232,7 @@ class Keyboards:
 
 
 # ==============================================================================
-# 4. MIDDLEWARES (OBUNA VA SPAM TEKSHIRUVI)
+# 4. MIDDLEWARES (QAT'IY OBUNA TEKSHIRUVI)
 # ==============================================================================
 
 class MultiChannelSubMiddleware(types.TelegramObject):
@@ -227,15 +245,14 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         bot: Bot = data['bot']
         user: types.User = data.get('event_from_user')
 
-        # Adminlar uchun tekshiruv shart emas
         if not user or user.id in ADMINS:
             return await handler(event, data)
 
-        # "Obunani tekshirish" tugmasini bosganda middleware to'xtatmaydi
+        # "Obunani tekshirish" tugmasiga to'g'ridan-to'g'ri o'tkazish
         if isinstance(event, CallbackQuery) and event.data == "check_sub":
             return await handler(event, data)
 
-        # Keshda obuna bor bo'lsa o'tkazish
+        # Keshni tekshirish
         if sub_cache.get(user.id) is True:
             return await handler(event, data)
 
@@ -250,13 +267,13 @@ class MultiChannelSubMiddleware(types.TelegramObject):
                 if member.status in ["left", "kicked"]:
                     unsubscribed_channels.append((title, link))
             except Exception as e:
-                logger.warning(f"Kanal tekshirishda xatolik: {ch_id} - {e}")
+                logger.warning(f"Kanal tekshirishda xatolik: ID: {ch_id} - Xatolik: {e}")
 
         if not unsubscribed_channels:
             sub_cache[user.id] = True
             return await handler(event, data)
 
-        # Obuna bo'lmagan kanallar bo'lsa -> Tugmalarni ko'rsatamiz
+        # Obunasi bo'lmasa xabar va tugmalarni chiqarish
         keyboard = []
         for title, link in unsubscribed_channels:
             keyboard.append([InlineKeyboardButton(text=f"📢 {title}", url=link)])
