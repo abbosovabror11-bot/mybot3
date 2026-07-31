@@ -26,7 +26,9 @@ from aiogram.types import (
     KeyboardButton,
     Message,
     CallbackQuery,
-    TelegramObject
+    TelegramObject,
+    LabeledPrice,
+    WebAppInfo
 )
 from aiogram.utils.chat_action import ChatActionSender
 
@@ -40,6 +42,8 @@ ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip(
 
 PORT = int(os.getenv("PORT", 8080))
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
+# Mini App saytingiz havolasini shu yerga yozasiz (masalan: https://username.github.io/app/)
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://your-mini-app-url.com") 
 DATABASE_PATH = "bot_data.db"
 
 NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
@@ -79,6 +83,15 @@ class Database:
                     title TEXT NOT NULL,
                     invite_link TEXT NOT NULL
                 )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            await db.execute("""
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('star_price', '50')
             """)
             await db.commit()
 
@@ -141,10 +154,7 @@ class Database:
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT COUNT(*), SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), SUM(generations_count) FROM users") as cursor:
                 row = await cursor.fetchone()
-                total = row[0] or 0
-                active = row[1] or 0
-                generations = row[2] or 0
-                return total, active, generations
+                return row[0] or 0, row[1] or 0, row[2] or 0
 
     @staticmethod
     async def add_channel(channel_id: int, title: str, invite_link: str):
@@ -170,6 +180,19 @@ class Database:
             async with db.execute("SELECT channel_id, title, invite_link FROM channels") as cursor:
                 return await cursor.fetchall()
 
+    @staticmethod
+    async def get_star_price() -> int:
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            async with db.execute("SELECT value FROM settings WHERE key = 'star_price'") as cursor:
+                row = await cursor.fetchone()
+                return int(row[0]) if row else 50
+
+    @staticmethod
+    async def set_star_price(new_price: int):
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            await db.execute("UPDATE settings SET value = ? WHERE key = 'star_price'", (str(new_price),))
+            await db.commit()
+
 
 # ==============================================================================
 # 3. KEYBOARDS
@@ -180,7 +203,8 @@ class Keyboards:
     def get_user_main() -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="🎨 AI Rasm Yaratish 🚀"), KeyboardButton(text="💡 Tasodifiy G'oya ✨")],
+                [KeyboardButton(text="🎨 AI Rasm Yaratish 🚀"), KeyboardButton(text="🌐 Mini App Ochish 📱", web_app=WebAppInfo(url=WEB_APP_URL))],
+                [KeyboardButton(text="💡 Tasodifiy G'oya ✨"), KeyboardButton(text="⭐ Stars Sotib Olish 💰")],
                 [KeyboardButton(text="🏆 TOP-10 Liderlar ⭐️"), KeyboardButton(text="📊 Mening Statistikam 📈")],
                 [KeyboardButton(text="ℹ️ Bot Haqida 🤖")]
             ],
@@ -191,9 +215,9 @@ class Keyboards:
     def get_admin_main() -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="📢 Kanallarni Boshqarish ⚙️"), KeyboardButton(text="📊 Umumiy Statistika 📈")],
-                [KeyboardButton(text="📣 Reklama Tarqatish 🚀"), KeyboardButton(text="💾 Bazani Yuklab Olish 📥")],
-                [KeyboardButton(text="👤 Foydalanuvchi Rejimiga O'tish ⬅️")]
+                [KeyboardButton(text="📢 Kanallarni Boshqarish ⚙️"), KeyboardButton(text="⭐ Stars Narxini O'zgartirish 💰")],
+                [KeyboardButton(text="📊 Umumiy Statistika 📈"), KeyboardButton(text="📣 Reklama Tarqatish 🚀")],
+                [KeyboardButton(text="💾 Bazani Yuklab Olish 📥"), KeyboardButton(text="👤 Foydalanuvchi Rejimiga O'tish ⬅️")]
             ],
             resize_keyboard=True
         )
@@ -207,7 +231,7 @@ class Keyboards:
 
 
 # ==============================================================================
-# 4. MAJBURiY OBUNA TEKSHIRUVI
+# 4. MAJBURIY OBUNA TEKSHIRUVI
 # ==============================================================================
 
 async def check_user_subscriptions(bot: Bot, user_id: int) -> List[Tuple[str, str]]:
@@ -267,7 +291,7 @@ class SubscriptionMiddleware(types.TelegramObject):
 
 
 # ==============================================================================
-# 5. UZLUKSIZ AI RASM CHIZISH ENGINE (MULTI-SERVER FALLBACK)
+# 5. AI GENERATOR ENGINE
 # ==============================================================================
 
 class AIService:
@@ -294,9 +318,8 @@ class AIService:
     @staticmethod
     async def generate_image(prompt: str) -> Tuple[BytesIO | None, str]:
         encoded_prompt = urllib.parse.quote(prompt)
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        headers = {'User-Agent': 'Mozilla/5.0'}
 
-        # 1-MANBA: Pollinations Fast Node
         url1 = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}&model=flux"
         try:
             async with aiohttp.ClientSession() as session:
@@ -306,9 +329,8 @@ class AIService:
                         if len(data) > 5000:
                             return BytesIO(data), "Flux Ultra HD"
         except Exception as e:
-            logger.warning(f"1-Node javob bermadi: {e}")
+            logger.warning(f"1-Node xatosi: {e}")
 
-        # 2-MANBA: Lexica Engine
         url2 = f"https://lexica.art/api/v1/search?q={encoded_prompt}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -321,31 +343,7 @@ class AIService:
                                 if img_resp.status == 200:
                                     return BytesIO(await img_resp.read()), "Lexica AI"
         except Exception as e:
-            logger.warning(f"2-Node javob bermadi: {e}")
-
-        # 3-MANBA: Pollinations Standard Fallback
-        url3 = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url3, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        if len(data) > 5000:
-                            return BytesIO(data), "Turbo AI Engine"
-        except Exception as e:
-            logger.warning(f"3-Node javob bermadi: {e}")
-
-        # 4-MANBA: Craiyon/DuckDuckGo Public API
-        url4 = f"https://duckduckgo.com/iu/?u=https://image.pollinations.ai/prompt/{encoded_prompt}"
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url4, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        if len(data) > 5000:
-                            return BytesIO(data), "Backup AI Node"
-        except Exception as e:
-            logger.warning(f"4-Node javob bermadi: {e}")
+            logger.warning(f"2-Node xatosi: {e}")
 
         return None, "Xatolik"
 
@@ -354,7 +352,6 @@ class AIService:
         image_bytes.seek(0)
         img = Image.open(image_bytes).convert("RGBA")
         img.thumbnail((512, 512))
-        
         output = BytesIO()
         img.save(output, format="WEBP", quality=95)
         output.seek(0)
@@ -362,7 +359,7 @@ class AIService:
 
 
 # ==============================================================================
-# 6. WEB SERVER
+# 6. WEB SERVER (Ping & Mini App Receiver)
 # ==============================================================================
 
 async def handle_ping(request):
@@ -383,7 +380,6 @@ async def self_ping_loop():
     await asyncio.sleep(10)
     if not RENDER_EXTERNAL_URL:
         return
-
     ping_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/ping"
     while True:
         try:
@@ -402,6 +398,7 @@ async def self_ping_loop():
 class AdminState(StatesGroup):
     waiting_for_broadcast = State()
     waiting_for_channel_data = State()
+    waiting_for_new_price = State()
 
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -417,240 +414,190 @@ async def start_handler(message: types.Message, state: FSMContext):
         full_name=message.from_user.full_name,
         username=message.from_user.username
     )
-    
     kb = Keyboards.get_admin_main() if message.from_user.id in ADMINS else Keyboards.get_user_main()
-    
     await message.answer(
         "✨ **Professional AI Botiga Xush Kelibsiz!**\n\n"
-        "Manga xohlagan so'zingizni yuboring (Masalan: *Dengiz bo'yidagi kelajak shahri*), men unga mos **HD Rasm** hamda **Stiker** yaratib beraman!",
+        "Manga xohlagan matningizni yuboring yoki **Mini App** orqali qulay tarzda rasm yarating!",
         reply_markup=kb,
         parse_mode="Markdown"
     )
 
 @dp.message(Command("admin"), F.from_user.id.in_(ADMINS))
 async def admin_panel(message: types.Message):
-    await message.answer("👑 **Admin Panelga Xush Kelibsiz!**\nQuyidagi tugmalar orqali botni boshqarasiz:", reply_markup=Keyboards.get_admin_main())
+    await message.answer("👑 **Admin Panel:**", reply_markup=Keyboards.get_admin_main())
 
 @dp.message(F.text == "👤 Foydalanuvchi Rejimiga O'tish ⬅️")
 async def back_to_user_mode(message: types.Message):
     await message.answer("👤 Foydalanuvchi rejimiga o'tdingiz.", reply_markup=Keyboards.get_user_main())
 
-# ----------------- ADMIN -----------------
+# Mini App orqali yuborilgan ma'lumotni qabul qilish
+@dp.message(F.web_app_data)
+async def web_app_data_handler(message: types.Message):
+    prompt = message.web_app_data.data
+    await process_image_generation(message, prompt)
 
+# Kanallarni boshqarish
 @dp.message(F.text == "📢 Kanallarni Boshqarish ⚙️", F.from_user.id.in_(ADMINS))
 async def manage_channels(message: types.Message):
     channels = await Database.get_channels()
     text = "⚙️ **MAJBURIY OBUNA KANALLARI:**\n\n"
     keyboard = []
-    
     if channels:
         for ch_id, title, link in channels:
-            text += f"🔹 **{title}**\nID: `{ch_id}`\nHavola: {link}\n\n"
+            text += f"🔹 **{title}** (`{ch_id}`)\n"
             keyboard.append([InlineKeyboardButton(text=f"❌ O'chirish: {title}", callback_data=f"del_ch_{ch_id}")])
     else:
-        text += "⚠️ *Hozircha hech qanday kanal ulanmagan.*\n\n"
-        
+        text += "⚠️ *Hozircha kanal ulanmagan.*\n\n"
     keyboard.append([InlineKeyboardButton(text="➕ Yangi Kanal Qo'shish", callback_data="add_channel")])
-    kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
-    
-    await message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "add_channel", F.from_user.id.in_(ADMINS))
 async def start_add_channel(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(AdminState.waiting_for_channel_data)
-    await callback.message.answer(
-        "➕ **Yangi kanal qo'shish yo'riqnomasi:**\n\n"
-        "1. Botni kanalingizga **ADMIN** qiling.\n"
-        "2. Kanal ma'lumotlarini quyidagi formatda yuboring:\n\n"
-        "`Kanal_ID | Kanal_Nomi | Taklif_Havolasi`\n\n"
-        "📌 **Misol:**\n"
-        "`-1002143658790 | PICTURE UZ OFFICIAL | https://t.me/picturerasmiy`",
-        parse_mode="Markdown",
-        reply_markup=Keyboards.get_cancel()
-    )
+    await callback.message.answer("Kanal ma'lumotlarini yuboring:\n`Kanal_ID | Nomi | Havola`", parse_mode="Markdown", reply_markup=Keyboards.get_cancel())
     await callback.answer()
 
 @dp.message(StateFilter(AdminState.waiting_for_channel_data), F.from_user.id.in_(ADMINS))
 async def process_add_channel(message: types.Message, state: FSMContext):
     if message.text == "❌ Bekor Qilish":
         await state.clear()
-        await message.answer("❌ Bekor qilindi.", reply_markup=Keyboards.get_admin_main())
+        await message.answer("Bekor qilindi.", reply_markup=Keyboards.get_admin_main())
         return
-
     try:
         parts = [p.strip() for p in message.text.split("|")]
-        if len(parts) != 3:
-            await message.answer("⚠️ Format noto'g'ri. Iltimos: `Kanal_ID | Kanal_Nomi | Taklif_Havolasi` shaklida yuboring.")
-            return
-
-        ch_id = int(parts[0])
-        title = parts[1]
-        link = parts[2]
-
-        await Database.add_channel(ch_id, title, link)
+        await Database.add_channel(int(parts[0]), parts[1], parts[2])
         await state.clear()
-        await message.answer(f"✅ **{title}** muvaffaqiyatli saqlandi!", reply_markup=Keyboards.get_admin_main())
-    except ValueError:
-        await message.answer("⚠️ Kanal ID raqam bo'lishi kerak (Masalan: -1001234567890).")
+        await message.answer("✅ Kanal qo'shildi!", reply_markup=Keyboards.get_admin_main())
     except Exception as e:
-        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+        await message.answer(f"❌ Xatolik: {e}")
 
 @dp.callback_query(F.data.startswith("del_ch_"), F.from_user.id.in_(ADMINS))
 async def delete_channel_handler(callback: types.CallbackQuery):
-    ch_id = int(callback.data.split("_")[2])
-    await Database.delete_channel(ch_id)
-    await callback.answer("✅ Kanal o'chirildi!", show_alert=True)
+    await Database.delete_channel(int(callback.data.split("_")[2]))
+    await callback.answer("✅ O'chirildi!", show_alert=True)
     await callback.message.delete()
+
+# Stars narxini o'zgartirish
+@dp.message(F.text == "⭐ Stars Narxini O'zgartirish 💰", F.from_user.id.in_(ADMINS))
+async def change_price_start(message: types.Message, state: FSMContext):
+    current = await Database.get_star_price()
+    await state.set_state(AdminState.waiting_for_new_price)
+    await message.answer(f"💰 Joriy narx: `{current}` Stars\nYangi narelni yuboring:", reply_markup=Keyboards.get_cancel(), parse_mode="Markdown")
+
+@dp.message(StateFilter(AdminState.waiting_for_new_price), F.from_user.id.in_(ADMINS))
+async def process_new_price(message: types.Message, state: FSMContext):
+    if message.text == "❌ Bekor Qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=Keyboards.get_admin_main())
+        return
+    if message.text.isdigit():
+        await Database.set_star_price(int(message.text))
+        await state.clear()
+        await message.answer(f"✅ Yangi narx: {message.text} Stars", reply_markup=Keyboards.get_admin_main())
 
 @dp.message(F.text == "📊 Umumiy Statistika 📈", F.from_user.id.in_(ADMINS))
 async def admin_stats(message: types.Message):
-    total, active, generations = await Database.get_system_stats()
-    text = (
-        f"📈 **BOTNING UMUMIY STATISTIKASI:**\n\n"
-        f"👥 Jami Obunachilar: `{total}` ta\n"
-        f"🟢 Aktiv Foydalanuvchilar: `{active}` ta\n"
-        f"🎨 Yaratilgan AI Rasmlar: `{generations}` ta"
-    )
-    await message.answer(text, parse_mode="Markdown")
+    total, active, gens = await Database.get_system_stats()
+    await message.answer(f"📈 Jami: {total}\n🟢 Aktiv: {active}\n🎨 Rasmlar: {gens}")
 
 @dp.message(F.text == "📣 Reklama Tarqatish 🚀", F.from_user.id.in_(ADMINS))
 async def start_broadcast(message: types.Message, state: FSMContext):
     await state.set_state(AdminState.waiting_for_broadcast)
-    await message.answer("📢 **Reklama postini yuboring:**", reply_markup=Keyboards.get_cancel())
-
-@dp.message(F.text == "❌ Bekor Qilish", StateFilter(AdminState.waiting_for_broadcast))
-async def cancel_broadcast(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer("❌ Reklama bekor qilindi.", reply_markup=Keyboards.get_admin_main())
+    await message.answer("📢 Reklama postini yuboring:", reply_markup=Keyboards.get_cancel())
 
 @dp.message(StateFilter(AdminState.waiting_for_broadcast), F.from_user.id.in_(ADMINS))
 async def process_broadcast(message: types.Message, state: FSMContext):
     await state.clear()
     users = await Database.get_all_user_ids()
-    await message.answer(f"⏳ `{len(users)}` ta foydalanuvchiga reklama yuborilmoqda...", parse_mode="Markdown")
-
-    success, failed = 0, 0
     for uid in users:
         try:
             await message.copy_to(chat_id=uid)
-            success += 1
-            await asyncio.sleep(0.04)
-        except Exception:
-            failed += 1
-            await Database.set_user_active(uid, False)
-
-    await message.answer(
-        f"🚀 **Reklama tarqatildi!**\n\n🟢 Yuborildi: `{success}`\n🔴 Yetib bormadi: `{failed}`",
-        reply_markup=Keyboards.get_admin_main(),
-        parse_mode="Markdown"
-    )
+            await asyncio.sleep(0.03)
+        except:
+            pass
+    await message.answer("✅ Reklama tarqatildi!", reply_markup=Keyboards.get_admin_main())
 
 @dp.message(F.text == "💾 Bazani Yuklab Olish 📥", F.from_user.id.in_(ADMINS))
 async def download_db(message: types.Message):
     if os.path.exists(DATABASE_PATH):
-        db_file = FSInputFile(DATABASE_PATH)
-        await message.answer_document(document=db_file, caption="💾 **Ma'lumotlar bazasi zaxira nusxasi.**")
-    else:
-        await message.answer("❌ Baza topilmadi.")
+        await message.answer_document(FSInputFile(DATABASE_PATH))
 
-# ----------------- FOYDALANUVCHI -----------------
+# Foydalanuvchi qismi
+@dp.message(F.text == "⭐ Stars Sotib Olish 💰")
+async def send_invoice_handler(message: types.Message):
+    price = await Database.get_star_price()
+    await message.bot.send_invoice(
+        chat_id=message.chat.id, title="VIP Obuna", description="AI imkoniyatlari",
+        payload="vip", provider_token="", currency="XTR", prices=[LabeledPrice(label="Paket", amount=price)]
+    )
+
+@dp.pre_checkout_query()
+async def pre_checkout_handler(query: types.PreCheckoutQuery):
+    await query.bot.answer_pre_checkout_query(query.id, ok=True)
+
+@dp.message(F.successful_payment)
+async def successful_payment_handler(message: types.Message):
+    await message.answer("🎉 To'lov muvaffaqiyatli amalga oshirildi!")
 
 @dp.message(F.text == "🏆 TOP-10 Liderlar ⭐️")
 async def show_top(message: types.Message):
-    top_users = await Database.get_top_users(10)
-    text = "⭐️ **Eng Faol TOP-10 AI Ijodkorlar:**\n\n"
-    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
-    for idx, (name, count) in enumerate(top_users):
-        medal = medals[idx] if idx < len(medals) else "👤"
-        safe_name = name.replace("<", "").replace(">", "")
-        text += f"{medal} **{safe_name}** — `{count}` ta rasm\n"
+    top = await Database.get_top_users(10)
+    text = "⭐️ **TOP-10 Liderlar:**\n\n"
+    for idx, (name, count) in enumerate(top, 1):
+        text += f"{idx}. {name} — {count} ta\n"
     await message.answer(text, parse_mode="Markdown")
 
 @dp.message(F.text == "📊 Mening Statistikam 📈")
 async def user_stats(message: types.Message):
     count = await Database.get_user_stats(message.from_user.id)
-    await message.answer(f"📊 **Siz yaratgan AI rasmlar soni:** `{count}` ta", parse_mode="Markdown")
+    await message.answer(f"📊 Siz yaratgan rasmlar: `{count}` ta", parse_mode="Markdown")
 
 @dp.message(F.text == "💡 Tasodifiy G'oya ✨")
 async def random_idea(message: types.Message):
-    ideas = [
-        "Cyberpunk uslubidagi neon chiroqlar ostidagi Toshkent shahri",
-        "Koinotda suzib yurgan sehrli shisha saroy, HD 8k render",
-        "O'zbekiston tog'larida joylashgan kelajak texnologiyalar shahri",
-        "Toshkent metrosida kofe ichib o'tirgan multfilm qahramoni",
-        "Sehrli o'rmon ichida yonayotgan kristal shar"
-    ]
     import random
-    idea = random.choice(ideas)
-    await message.answer(f"✨ **G'oya:** `{idea}`\n\nUshbu matnni nusxalab botga yuboring!", parse_mode="Markdown")
+    ideas = ["Cyberpunk Toshkent", "Koinotdagi saroy", "Sehrli o'rmon"]
+    await message.answer(f"✨ G'oya: `{random.choice(ideas)}`", parse_mode="Markdown")
 
 @dp.message(F.text == "🎨 AI Rasm Yaratish 🚀")
-@dp.message(F.text == "ℹ️ Bot Haqida 🤖")
 async def info_handler(message: types.Message):
-    await message.answer(
-        "🎨 **Rasm va Stiker yaratish yo'riqnomasi:**\n\n"
-        "Shunchaki xohlagan tasviringizni matn ko'rinishida yuboring (Masalan: *Balandlikda o'tirgan chiroyli mushuk*) va bot sizga mos **HD Rasm** va **Stiker** yaratib beradi!",
-        parse_mode="Markdown"
-    )
+    await message.answer("🎨 Xohlagan matningizni yuboring yoki Mini App'dan foydalaning!")
 
 @dp.callback_query(F.data == "check_sub")
 async def check_sub_handler(callback: types.CallbackQuery, bot: Bot):
     unsubscribed = await check_user_subscriptions(bot, callback.from_user.id)
-
     if not unsubscribed:
-        try:
-            await callback.message.delete()
-        except Exception:
-            pass
-        await callback.message.answer("🎉 **Obunangiz tasdiqlandi!** Endi istalgan matningizni yuborib HD rasm olishingiz mumkin.", reply_markup=Keyboards.get_user_main())
+        try: await callback.message.delete() except: pass
+        await callback.message.answer("🎉 Tasdiqlandi!", reply_markup=Keyboards.get_user_main())
     else:
-        await callback.answer("❌ Siz hali barcha kanallarga obuna bo'lmadingiz!", show_alert=True)
+        await callback.answer("❌ Hali hamma kanalga obuna bo'lmadingiz!", show_alert=True)
 
-# ----------------- AI GENERATSIYA -----------------
-
-@dp.message(F.text & ~F.text.startswith("/"))
-async def generate_ai_handler(message: types.Message):
-    user_prompt = message.text.strip()
-    
-    if user_prompt in [
-        "🎨 AI Rasm Yaratish 🚀", "💡 Tasodifiy G'oya ✨", "🏆 TOP-10 Liderlar ⭐️",
-        "📊 Mening Statistikam 📈", "ℹ️ Bot Haqida 🤖", "📢 Kanallarni Boshqarish ⚙️",
-        "📊 Umumiy Statistika 📈", "📣 Reklama Tarqatish 🚀", "💾 Bazani Yuklab Olish 📥",
-        "👤 Foydalanuvchi Rejimiga O'tish ⬅️", "❌ Bekor Qilish"
-    ]:
-        return
-
+# Asosiy AI Generator funksiyasi
+async def process_image_generation(message: types.Message, user_prompt: str):
     if AIService.is_nsfw(user_prompt):
-        await message.answer("⚠️ **Kechirasiz! Botda nojo'ya va taqiqlangan mazmundagi rasmlarni yaratish cheklangan.**")
+        await message.answer("⚠️ Taqiqlangan so'z aniqlandi!")
         return
 
     async with ChatActionSender.upload_photo(bot=data_bot, chat_id=message.chat.id):
-        status_msg = await message.answer("🎨 *AI rasmingiz va stikeringizni chizmoqda... Biroz kutib turing.*", parse_mode="Markdown")
-        
+        status_msg = await message.answer("🎨 *AI rasm chizmoqda...*", parse_mode="Markdown")
         en_prompt = await AIService.translate_to_english(user_prompt)
-        img_bytes, engine_name = await AIService.generate_image(en_prompt)
+        img_bytes, engine = await AIService.generate_image(en_prompt)
 
         if not img_bytes:
-            await status_msg.edit_text("❌ Rasmni yuklab bo'lmadi, iltimos qayta urinib ko'ring.")
+            await status_msg.edit_text("❌ Xatolik yuz berdi.")
             return
 
         sticker_bytes = AIService.create_sticker(img_bytes)
         img_bytes.seek(0)
-        
-        bot_info = await data_bot.get_me()
-        
-        await message.answer_photo(
-            photo=BufferedInputFile(img_bytes.read(), filename="ai_image.png"),
-            caption=f"🖼 **So'rovingiz:** `{user_prompt}`\n⚙️ **Engine:** `{engine_name}`\n\n✨ Botimiz: @{bot_info.username}",
-            parse_mode="Markdown"
-        )
-        
-        await message.answer_sticker(
-            sticker=BufferedInputFile(sticker_bytes.read(), filename="sticker.webp")
-        )
+
+        await message.answer_photo(BufferedInputFile(img_bytes.read(), filename="img.png"), caption=f"🖼 `{user_prompt}`", parse_mode="Markdown")
+        await message.answer_sticker(BufferedInputFile(sticker_bytes.read(), filename="st.webp"))
         
         await Database.increment_generation(message.from_user.id)
         await status_msg.delete()
+
+@dp.message(F.text & ~F.text.startswith("/"))
+async def text_handler(message: types.Message):
+    await process_image_generation(message, message.text.strip())
 
 
 # ==============================================================================
@@ -660,21 +607,14 @@ async def generate_ai_handler(message: types.Message):
 async def main():
     global data_bot
     data_bot = Bot(token=BOT_TOKEN)
-    
     await Database.init_db()
-    
     asyncio.create_task(start_web_server())
     asyncio.create_task(self_ping_loop())
-    
-    logger.info("🚀 Bot va Web Server ishga tushdi!")
-    
+    logger.info("🚀 Bot ishga tushdi!")
     try:
         await dp.start_polling(data_bot)
     finally:
         await data_bot.session.close()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Bot to'xtatildi!")
+    asyncio.run(main())
