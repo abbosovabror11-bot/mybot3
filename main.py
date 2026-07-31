@@ -10,7 +10,6 @@ from typing import Callable, Dict, Any, Awaitable, List, Tuple
 import aiohttp
 import aiosqlite
 from PIL import Image
-from cachetools import TTLCache
 from aiohttp import web
 
 from aiogram import Bot, Dispatcher, F, types
@@ -208,10 +207,24 @@ class Keyboards:
 
 
 # ==============================================================================
-# 4. MIDDLEWARES (MAJBURiY OBUNA TEKSHIRUVI)
+# 4. MAJBURiY OBUNA TEKSHIRUVI
 # ==============================================================================
 
-class MultiChannelSubMiddleware(types.TelegramObject):
+async def check_user_subscriptions(bot: Bot, user_id: int) -> List[Tuple[str, str]]:
+    channels = await Database.get_channels()
+    unsubscribed = []
+    
+    for ch_id, title, link in channels:
+        try:
+            member = await bot.get_chat_member(chat_id=ch_id, user_id=user_id)
+            if member.status in ["left", "kicked"]:
+                unsubscribed.append((title, link))
+        except Exception as e:
+            logger.warning(f"Kanalni tekshirishda xatolik: {e}")
+            
+    return unsubscribed
+
+class SubscriptionMiddleware(types.TelegramObject):
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -219,32 +232,24 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         data: Dict[str, Any]
     ) -> Any:
         bot: Bot = data['bot']
-        user: types.User = data.get('event_from_user')
+        
+        user: types.User = None
+        if isinstance(event, Message):
+            user = event.from_user
+        elif isinstance(event, CallbackQuery):
+            user = event.from_user
 
-        # Adminlar uchun tekshiruv yo'q
         if not user or user.id in ADMINS:
             return await handler(event, data)
 
-        # "Tekshirish" tugmasi bosilganda o'tkazib yuboramiz
         if isinstance(event, CallbackQuery) and event.data == "check_sub":
             return await handler(event, data)
 
-        channels = await Database.get_channels()
-        if not channels:
-            return await handler(event, data)
+        unsubscribed = await check_user_subscriptions(bot, user.id)
 
-        unsubscribed_channels = []
-        for ch_id, title, link in channels:
-            try:
-                member = await bot.get_chat_member(chat_id=ch_id, user_id=user.id)
-                if member.status in ["left", "kicked"]:
-                    unsubscribed_channels.append((title, link))
-            except Exception as e:
-                logger.warning(f"Kanalni tekshirishda xatolik (ID: {ch_id}): {e}")
-
-        if unsubscribed_channels:
+        if unsubscribed:
             keyboard = []
-            for title, link in unsubscribed_channels:
+            for title, link in unsubscribed:
                 keyboard.append([InlineKeyboardButton(text=f"📢 {title}", url=link)])
             
             keyboard.append([InlineKeyboardButton(text="✅ Obunani Tekshirish", callback_data="check_sub")])
@@ -262,7 +267,7 @@ class MultiChannelSubMiddleware(types.TelegramObject):
 
 
 # ==============================================================================
-# 5. AI XIZMATLARI
+# 5. UZLUKSIZ AI RASM CHIZISH ENGINE (MULTI-SERVER FALLBACK)
 # ==============================================================================
 
 class AIService:
@@ -276,8 +281,9 @@ class AIService:
         try:
             encoded_text = urllib.parse.quote(text)
             url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q={encoded_text}"
+            headers = {'User-Agent': 'Mozilla/5.0'}
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=6)) as resp:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         return data[0][0][0]
@@ -288,30 +294,58 @@ class AIService:
     @staticmethod
     async def generate_image(prompt: str) -> Tuple[BytesIO | None, str]:
         encoded_prompt = urllib.parse.quote(prompt)
-        url1 = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+
+        # 1-MANBA: Pollinations Fast Node
+        url1 = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}&model=flux"
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url1, timeout=aiohttp.ClientTimeout(total=25)) as resp:
+                async with session.get(url1, headers=headers, timeout=aiohttp.ClientTimeout(total=12)) as resp:
                     if resp.status == 200:
                         data = await resp.read()
                         if len(data) > 5000:
-                            return BytesIO(data), "Pollinations AI"
+                            return BytesIO(data), "Flux Ultra HD"
         except Exception as e:
-            logger.warning(f"1-API xatosi: {e}")
+            logger.warning(f"1-Node javob bermadi: {e}")
 
+        # 2-MANBA: Lexica Engine
         url2 = f"https://lexica.art/api/v1/search?q={encoded_prompt}"
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url2, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+                async with session.get(url2, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         if data.get("images"):
                             img_src = data["images"][0]["src"]
-                            async with session.get(img_src) as img_resp:
+                            async with session.get(img_src, headers=headers) as img_resp:
                                 if img_resp.status == 200:
-                                    return BytesIO(await img_resp.read()), "Lexica Engine"
+                                    return BytesIO(await img_resp.read()), "Lexica AI"
         except Exception as e:
-            logger.warning(f"2-API xatosi: {e}")
+            logger.warning(f"2-Node javob bermadi: {e}")
+
+        # 3-MANBA: Pollinations Standard Fallback
+        url3 = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=800&nologo=true"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url3, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        if len(data) > 5000:
+                            return BytesIO(data), "Turbo AI Engine"
+        except Exception as e:
+            logger.warning(f"3-Node javob bermadi: {e}")
+
+        # 4-MANBA: Craiyon/DuckDuckGo Public API
+        url4 = f"https://duckduckgo.com/iu/?u=https://image.pollinations.ai/prompt/{encoded_prompt}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url4, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        if len(data) > 5000:
+                            return BytesIO(data), "Backup AI Node"
+        except Exception as e:
+            logger.warning(f"4-Node javob bermadi: {e}")
 
         return None, "Xatolik"
 
@@ -371,10 +405,9 @@ class AdminState(StatesGroup):
 
 dp = Dispatcher(storage=MemoryStorage())
 
-# Faqat majburiy obuna middleware si qoladi (Spam cheklovi olib tashlandi!)
-sub_mw = MultiChannelSubMiddleware()
-dp.message.outer_middleware(sub_mw)
-dp.callback_query.outer_middleware(sub_mw)
+sub_mw = SubscriptionMiddleware()
+dp.message.middleware(sub_mw)
+dp.callback_query.middleware(sub_mw)
 
 @dp.message(CommandStart())
 async def start_handler(message: types.Message, state: FSMContext):
@@ -562,18 +595,9 @@ async def info_handler(message: types.Message):
 
 @dp.callback_query(F.data == "check_sub")
 async def check_sub_handler(callback: types.CallbackQuery, bot: Bot):
-    channels = await Database.get_channels()
-    unsubscribed_channels = []
-    
-    for ch_id, title, link in channels:
-        try:
-            member = await bot.get_chat_member(chat_id=ch_id, user_id=callback.from_user.id)
-            if member.status in ["left", "kicked"]:
-                unsubscribed_channels.append((title, link))
-        except Exception:
-            pass
+    unsubscribed = await check_user_subscriptions(bot, callback.from_user.id)
 
-    if not unsubscribed_channels:
+    if not unsubscribed:
         try:
             await callback.message.delete()
         except Exception:
@@ -607,7 +631,7 @@ async def generate_ai_handler(message: types.Message):
         img_bytes, engine_name = await AIService.generate_image(en_prompt)
 
         if not img_bytes:
-            await status_msg.edit_text("❌ Serverlar hozirda band. Iltimos, 1 minutdan so'ng qayta urinib ko'ring.")
+            await status_msg.edit_text("❌ Rasmni yuklab bo'lmadi, iltimos qayta urinib ko'ring.")
             return
 
         sticker_bytes = AIService.create_sticker(img_bytes)
