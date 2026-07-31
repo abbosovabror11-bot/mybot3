@@ -3,45 +3,495 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Generator Mini App</title>
+    <title>AI PICTURES - Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: #fff; padding: 20px; text-align: center; }
-        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; background: #1e293b; color: #fff; font-size: 16px; box-sizing: border-box; }
-        button { background: #6366f1; color: white; border: none; padding: 14px; width: 100%; border-radius: 8px; font-size: 18px; cursor: pointer; font-weight: bold; margin-top: 15px; }
-        button:hover { background: #4f46e5; }
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --accent: #00ff88;
+            --accent-glow: rgba(0, 255, 136, 0.3);
+            --text-main: #ffffff;
+            --text-muted: #8b949e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding-bottom: 80px;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .logo-title {
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            color: var(--accent);
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .view {
+            display: none;
+        }
+        .view.active {
+            display: block;
+        }
+
+        .profile-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            border: 1px solid #30363d;
+        }
+
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            margin: 0 auto 12px;
+            object-fit: cover;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .username {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .user-id {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: var(--text-muted);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .item-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid #30363d;
+            text-align: center;
+            position: relative;
+        }
+
+        .item-card img {
+            width: 100%;
+            height: 120px;
+            border-radius: 8px;
+            object-fit: cover;
+            margin-bottom: 8px;
+        }
+
+        .item-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .item-price {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            font-size: 13px;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .btn:active {
+            opacity: 0.8;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            box-shadow: none;
+        }
+
+        .balance-box {
+            background: var(--card-bg);
+            border: 1px solid #30363d;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .balance-amount {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--accent);
+            margin: 10px 0;
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .topup-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border-top: 1px solid #30363d;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            z-index: 100;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .nav-item {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            gap: 4px;
+        }
+
+        .nav-item.active {
+            color: var(--accent);
+        }
+
+        .nav-item svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid #30363d;
+            padding: 20px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 10px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            color: white;
+            margin: 15px 0;
+            font-size: 16px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <h2>🎨 AI Rasm Generator</h2>
-    <p>Xohlagan g'oyangizni kiriting va uslubni tanlang:</p>
+
+<div class="container">
     
-    <input type="text" id="promptInput" placeholder="Masalan: Koinotdagi kema...">
-    
-    <select id="styleSelect">
-        <option value="Cyberpunk style">Cyberpunk</option>
-        <option value="Realistic 8k, photorealistic">Realistik (8K)</option>
-        <option value="Anime masterpiece">Anime</option>
-        <option value="3D Pixar style">3D Multfilm</option>
-        <option value="Fantasy magical world">Fentezi</option>
-    </select>
+    <!-- 1. BOSH SAHIFA -->
+    <div id="view-home" class="view active">
+        <div class="header">
+            <div class="logo-title">AI PICTURES</div>
+        </div>
 
-    <button onclick="sendData()">Rasmni Yaratish 🚀</button>
+        <div class="balance-box">
+            <div class="section-title">Hisobingiz (Admin ID: 8694110588)</div>
+            <div class="balance-amount" id="user-balance">300 ⭐ / 0 so'm</div>
+            <div class="topup-buttons">
+                <button class="btn" onclick="topUp('stars')">⭐ Stars To'ldirish</button>
+                <button class="btn btn-outline" onclick="topUp('uzs')">💳 So'mda To'ldirish</button>
+            </div>
+        </div>
 
-    <script>
-        let tg = window.Telegram.WebApp;
-        tg.expand();
+        <div class="section-title">Ma'lumot</div>
+        <div style="background: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid #30363d; font-size: 14px; color: var(--text-muted);">
+            ✨ Auksiondagi har bir savdodan tushadigan **15% komissiya Stars** avtomatik ravishda egasiga (ID: 8694110588) yo'naltiriladi.
+        </div>
+    </div>
 
-        function sendData() {
-            let prompt = document.getElementById('promptInput').value;
-            let style = document.getElementById('styleSelect').value;
-            if (!prompt) {
-                alert("Iltimos, matn kiriting!");
-                return;
-            }
-            let fullText = prompt + ", " + style;
-            tg.sendData(fullText);
+    <!-- 2. AUKSION SAHIFASI -->
+    <div id="view-auction" class="view">
+        <div class="header">
+            <div class="logo-title">AUKSION</div>
+        </div>
+        <div class="section-title">Sotuvdagi Rasmlar</div>
+        <div class="grid" id="market-grid"></div>
+    </div>
+
+    <!-- 3. INVENTAR -->
+    <div id="view-inventory" class="view">
+        <div class="header">
+            <div class="logo-title">INVENTAR</div>
+        </div>
+        <div class="section-title">Sizdagi Rasmlar</div>
+        <div class="grid" id="inventory-grid"></div>
+    </div>
+
+    <!-- 4. PROFIL -->
+    <div id="view-profile" class="view">
+        <div class="profile-card">
+            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" class="avatar" id="user-avatar" alt="Avatar">
+            <div class="username" id="profile-name">ABBOSOV 🍀</div>
+            <div class="user-id" id="profile-id">ID: 8694110588</div>
+        </div>
+
+        <div class="section-title">🏆 Yaratilgan va Sotib Olingan Rasmlar</div>
+        <div class="grid" id="profile-grid"></div>
+    </div>
+
+</div>
+
+<!-- Auksion modal -->
+<div class="modal" id="auction-modal">
+    <div class="modal-content">
+        <h3>Auksionga qo'yish</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 5px;">Stars narxini kiriting. Sotilganda 15% komissiya egasiga (8694110588) tushadi.</p>
+        <input type="number" id="auction-price-input" placeholder="Stars narxi">
+        <button class="btn" onclick="confirmAuction()">Auksionga chiqarish</button>
+        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal()">Bekor qilish</button>
+    </div>
+</div>
+
+<!-- Navigation Bar -->
+<nav class="nav-bar">
+    <button class="nav-item active" onclick="switchView('home', this)">
+        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        Bosh sahifa
+    </button>
+    <button class="nav-item" onclick="switchView('auction', this)">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        Auksion
+    </button>
+    <button class="nav-item" onclick="switchView('inventory', this)">
+        <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 15H4V8h16v11z"/></svg>
+        Inventar
+    </button>
+    <button class="nav-item" onclick="switchView('profile', this)">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        Profil
+    </button>
+</nav>
+
+<script>
+    let tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // Doimiy egasining Telegram ID'si kodga biriktirildi
+    const OWNER_TELEGRAM_ID = "8694110588";
+
+    let user = tg.initDataUnsafe?.user;
+    if (user) {
+        document.getElementById('profile-name').innerText = user.first_name || "ABBOSOV 🍀";
+        // Agar ochgan odam o'zingiz bo'lsangiz ID chiqadi, lekin egalik doim 8694110588 da qoladi
+        document.getElementById('profile-id').innerText = "ID: " + (user.id || OWNER_TELEGRAM_ID);
+        if (user.photo_url) document.getElementById('user-avatar').src = user.photo_url;
+    }
+
+    let inventory = JSON.parse(localStorage.getItem('ai_inventory')) || [
+        { id: 1, title: "Neon Cyber #1", img: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300", price: 1650 },
+        { id: 2, title: "Abstract Wave", img: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=300", price: 850 }
+    ];
+
+    let market = JSON.parse(localStorage.getItem('ai_market')) || [
+        { id: 101, title: "Cosmic Art", img: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=300", price: 500 },
+        { id: 102, title: "Future City", img: "https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?w=300", price: 750 }
+    ];
+
+    let selectedItemId = null;
+
+    function saveData() {
+        localStorage.setItem('ai_inventory', JSON.stringify(inventory));
+        localStorage.setItem('ai_market', JSON.stringify(market));
+    }
+
+    function switchView(viewName, element) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        
+        document.getElementById('view-' + viewName).classList.add('active');
+        element.classList.add('active');
+
+        if (viewName === 'inventory') renderInventory();
+        if (viewName === 'auction') renderMarket();
+        if (viewName === 'profile') renderProfile();
+    }
+
+    function renderInventory() {
+        const grid = document.getElementById('inventory-grid');
+        grid.innerHTML = '';
+        if(inventory.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Inventar bo\'sh</p>';
+            return;
         }
-    </script>
+        inventory.forEach(item => {
+            grid.innerHTML += `
+                <div class="item-card">
+                    <img src="${item.img}" alt="Art">
+                    <div class="item-title">${item.title}</div>
+                    <div class="item-price">💎 ${item.price} ⭐</div>
+                    <button class="btn" onclick="openAuctionModal(${item.id})">Auksionga qo'yish</button>
+                </div>
+            `;
+        });
+    }
+
+    function renderMarket() {
+        const grid = document.getElementById('market-grid');
+        grid.innerHTML = '';
+        if(market.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Auksionda rasmlar yo\'q</p>';
+            return;
+        }
+        market.forEach(item => {
+            grid.innerHTML += `
+                <div class="item-card">
+                    <img src="${item.img}" alt="Art">
+                    <div class="item-title">${item.title}</div>
+                    <div class="item-price">💎 ${item.price} ⭐</div>
+                    <button class="btn" onclick="buyItem(${item.id})">Sotib olish</button>
+                </div>
+            `;
+        });
+    }
+
+    function renderProfile() {
+        const grid = document.getElementById('profile-grid');
+        grid.innerHTML = '';
+        if(inventory.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Rasmlar yo\'q</p>';
+            return;
+        }
+        inventory.forEach(item => {
+            grid.innerHTML += `
+                <div class="item-card">
+                    <img src="${item.img}" alt="Art">
+                    <div class="item-title">${item.title}</div>
+                    <div class="item-price">💎 ${item.price} ⭐</div>
+                </div>
+            `;
+        });
+    }
+
+    function openAuctionModal(id) {
+        selectedItemId = id;
+        document.getElementById('auction-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('auction-modal').style.display = 'none';
+    }
+
+    function confirmAuction() {
+        const priceInput = document.getElementById('auction-price-input').value;
+        if (!priceInput || priceInput <= 0) {
+            alert("To'g'ri narx kiriting!");
+            return;
+        }
+
+        const itemIndex = inventory.findIndex(i => i.id === selectedItemId);
+        if (itemIndex > -1) {
+            let item = inventory[itemIndex];
+            item.price = Number(priceInput);
+            
+            inventory.splice(itemIndex, 1);
+            market.push(item);
+            saveData();
+            closeModal();
+            alert("✅ Rasm auksionga chiqarildi!");
+            renderInventory();
+        }
+    }
+
+    function buyItem(id) {
+        const itemIndex = market.findIndex(i => i.id === id);
+        if (itemIndex > -1) {
+            let item = market[itemIndex];
+            market.splice(itemIndex, 1);
+            
+            inventory.push(item);
+            saveData();
+
+            let commission = Math.floor(item.price * 0.15);
+            alert(`🎉 Rasm sotib olindi!\n(15% komissiya (${commission} Stars) egasi — Telegram ID: ${OWNER_TELEGRAM_ID} hisobiga yuborildi).`);
+            renderMarket();
+        }
+    }
+
+    function topUp(type) {
+        if(type === 'stars') {
+            alert("Telegram Stars to'lov oynasi (ID: 8694110588 uchun) ochilmoqda...");
+        } else {
+            alert("Plastik karta orqali to'ldirish sahifasi ochilmoqda...");
+        }
+    }
+</script>
+
 </body>
 </html>
