@@ -32,7 +32,7 @@ from aiogram.types import (
 from aiogram.utils.chat_action import ChatActionSender
 
 # ==============================================================================
-# 1. KONFIGURATSIYA VA O'ZGARUVCHILAR
+# 1. KONFIGURATSIYA
 # ==============================================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAGxdKm-7d6cjFet5hnk2OD5Lu5h6T_7Tvk")
@@ -45,25 +45,10 @@ RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 DATABASE_PATH = "bot_data.db"
 
 # Keshlar
-sub_cache = TTLCache(maxsize=20000, ttl=300) # Obuna kesh vaqti uzaytirildi
+sub_cache = TTLCache(maxsize=20000, ttl=300)
 user_cooldown = TTLCache(maxsize=20000, ttl=4)
 
 NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
-
-# Menyu tugmalari matni (Obuna tekshiruvidan istisno qilish uchun)
-MENU_BUTTONS = [
-    "🎨 AI Rasm Yaratish 🚀",
-    "💡 Tasodifiy G'oya ✨",
-    "🏆 TOP-10 Liderlar ⭐️",
-    "📊 Mening Statistikam 📈",
-    "ℹ️ Bot Haqida 🤖",
-    "📢 Kanallarni Boshqarish ⚙️",
-    "📊 Umumiy Statistika 📈",
-    "📣 Reklama Tarqatish 🚀",
-    "💾 Bazani Yuklab Olish 📥",
-    "👤 Foydalanuvchi Rejimiga O'tish ⬅️",
-    "❌ Bekor Qilish"
-]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -229,7 +214,7 @@ class Keyboards:
 
 
 # ==============================================================================
-# 4. MIDDLEWARES (TUTIB QOLUVCHI FILTERLAR)
+# 4. MIDDLEWARES (OBUNA VA SPAM TEKSHIRUVI)
 # ==============================================================================
 
 class MultiChannelSubMiddleware(types.TelegramObject):
@@ -242,16 +227,15 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         bot: Bot = data['bot']
         user: types.User = data.get('event_from_user')
 
-        # Adminlar yoki foydalanuvchi mavjud bo'lmasa o'tkazib yuborish
+        # Adminlar uchun tekshiruv shart emas
         if not user or user.id in ADMINS:
             return await handler(event, data)
 
-        # /start komandasi yoki menyu tugmalari bosilganda obunani qayta tekshirmaslik
-        if isinstance(event, Message):
-            if event.text in MENU_BUTTONS or event.text.startswith("/start"):
-                return await handler(event, data)
+        # "Obunani tekshirish" tugmasini bosganda middleware to'xtatmaydi
+        if isinstance(event, CallbackQuery) and event.data == "check_sub":
+            return await handler(event, data)
 
-        # Keshda obunasi bor bo'lsa o'tkazish
+        # Keshda obuna bor bo'lsa o'tkazish
         if sub_cache.get(user.id) is True:
             return await handler(event, data)
 
@@ -263,32 +247,27 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         for ch_id, title, link in channels:
             try:
                 member = await bot.get_chat_member(chat_id=ch_id, user_id=user.id)
-                # left yoki kicked bo'lsa obunasiz deb hisoblash
                 if member.status in ["left", "kicked"]:
                     unsubscribed_channels.append((title, link))
             except Exception as e:
-                logger.warning(f"Kanal tekshirishda xatolik (Bot admin emasmi yoki ID xato?): {ch_id} - {e}")
-                # Agarda bot kanal admini bo'lmasa xatolik beradi, foydalanuvchini bloklab qo'ymaslik uchun o'tkazib yuboriladi
+                logger.warning(f"Kanal tekshirishda xatolik: {ch_id} - {e}")
 
         if not unsubscribed_channels:
             sub_cache[user.id] = True
             return await handler(event, data)
 
+        # Obuna bo'lmagan kanallar bo'lsa -> Tugmalarni ko'rsatamiz
         keyboard = []
         for title, link in unsubscribed_channels:
             keyboard.append([InlineKeyboardButton(text=f"📢 {title}", url=link)])
         
         keyboard.append([InlineKeyboardButton(text="✅ Obunani Tekshirish", callback_data="check_sub")])
-
         kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
         text = "🎁 **Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:**"
 
         if isinstance(event, Message):
             await event.answer(text, reply_markup=kb, parse_mode="Markdown")
         elif isinstance(event, CallbackQuery):
-            if event.data == "check_sub":
-                sub_cache.pop(user.id, None)
-                return await handler(event, data)
             await event.message.answer(text, reply_markup=kb, parse_mode="Markdown")
             await event.answer()
         return
@@ -306,11 +285,10 @@ class AntiSpamMiddleware(types.TelegramObject):
             return await handler(event, data)
 
         if isinstance(event, Message) and event.text and not event.text.startswith("/"):
-            if event.text not in MENU_BUTTONS:
-                if user_cooldown.get(user.id):
-                    await event.answer("⏳ **Iltimos, biroz kutib turing!** Ketma-ket so'rov yubormang.", parse_mode="Markdown")
-                    return
-                user_cooldown[user.id] = True
+            if user_cooldown.get(user.id):
+                await event.answer("⏳ **Iltimos, biroz kutib turing!** Ketma-ket so'rov yubormang.", parse_mode="Markdown")
+                return
+            user_cooldown[user.id] = True
 
         return await handler(event, data)
 
@@ -342,8 +320,6 @@ class AIService:
     @staticmethod
     async def generate_image(prompt: str) -> Tuple[BytesIO | None, str]:
         encoded_prompt = urllib.parse.quote(prompt)
-        
-        # Pollinations AI Engine
         url1 = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -353,9 +329,8 @@ class AIService:
                         if len(data) > 5000:
                             return BytesIO(data), "Pollinations AI v3"
         except Exception as e:
-            logger.warning(f"1-API ishlamadi: {e}")
+            logger.warning(f"1-API xatosi: {e}")
 
-        # Lexica AI Engine Backup
         url2 = f"https://lexica.art/api/v1/search?q={encoded_prompt}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -366,9 +341,9 @@ class AIService:
                             img_src = data["images"][0]["src"]
                             async with session.get(img_src) as img_resp:
                                 if img_resp.status == 200:
-                                    return BytesIO(await img_resp.read()), "Lexica AI Engine"
+                                    return BytesIO(await img_resp.read()), "Lexica Engine"
         except Exception as e:
-            logger.warning(f"2-API ishlamadi: {e}")
+            logger.warning(f"2-API xatosi: {e}")
 
         return None, "Xatolik"
 
@@ -385,7 +360,7 @@ class AIService:
 
 
 # ==============================================================================
-# 6. WEB SERVER & KEEP-ALIVE
+# 6. WEB SERVER
 # ==============================================================================
 
 async def handle_ping(request):
@@ -400,7 +375,7 @@ async def start_web_server():
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    logger.info(f"🌐 Web Server {PORT}-portda ishlamoqda!")
+    logger.info(f"🌐 Server {PORT}-portda ishlamoqda!")
 
 async def self_ping_loop():
     await asyncio.sleep(10)
@@ -419,7 +394,7 @@ async def self_ping_loop():
 
 
 # ==============================================================================
-# 7. HANDLERLAR VA FSM
+# 7. HANDLERLAR
 # ==============================================================================
 
 class AdminState(StatesGroup):
@@ -461,12 +436,11 @@ async def admin_panel(message: types.Message):
 async def back_to_user_mode(message: types.Message):
     await message.answer("👤 Foydalanuvchi rejimiga o'tdingiz.", reply_markup=Keyboards.get_user_main())
 
-# ----------------- ADMIN: KANAL BOSHQARUVI -----------------
+# ----------------- ADMIN -----------------
 
 @dp.message(F.text == "📢 Kanallarni Boshqarish ⚙️", F.from_user.id.in_(ADMINS))
 async def manage_channels(message: types.Message):
     channels = await Database.get_channels()
-    
     text = "⚙️ **MAJBURIY OBUNA KANALLARI:**\n\n"
     keyboard = []
     
@@ -529,8 +503,6 @@ async def delete_channel_handler(callback: types.CallbackQuery):
     await callback.answer("✅ Kanal o'chirildi!", show_alert=True)
     await callback.message.delete()
 
-# ----------------- ADMIN: STATISTIKA VA REKLAMA -----------------
-
 @dp.message(F.text == "📊 Umumiy Statistika 📈", F.from_user.id.in_(ADMINS))
 async def admin_stats(message: types.Message):
     total, active, generations = await Database.get_system_stats()
@@ -556,7 +528,7 @@ async def cancel_broadcast(message: types.Message, state: FSMContext):
 async def process_broadcast(message: types.Message, state: FSMContext):
     await state.clear()
     users = await Database.get_all_user_ids()
-    await message.answer(f"⏳ `{len(users)}` ta foydalanuvchiga reklama yuborish boshlandi...", parse_mode="Markdown")
+    await message.answer(f"⏳ `{len(users)}` ta foydalanuvchiga reklama yuborilmoqda...", parse_mode="Markdown")
 
     success, failed = 0, 0
     for uid in users:
@@ -582,7 +554,7 @@ async def download_db(message: types.Message):
     else:
         await message.answer("❌ Baza topilmadi.")
 
-# ----------------- FOYDALANUVCHI HANDLERLARI -----------------
+# ----------------- FOYDALANUVCHI -----------------
 
 @dp.message(F.text == "🏆 TOP-10 Liderlar ⭐️")
 async def show_top(message: types.Message):
@@ -637,19 +609,26 @@ async def check_sub_handler(callback: types.CallbackQuery, bot: Bot):
 
     if not unsubscribed_channels:
         sub_cache[callback.from_user.id] = True
-        await callback.message.delete()
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
         await callback.message.answer("🎉 **Obunangiz tasdiqlandi!** Endi istalgan matningizni yuborib HD rasm olishingiz mumkin.", reply_markup=Keyboards.get_user_main())
     else:
         await callback.answer("❌ Siz hali barcha kanallarga obuna bo'lmadingiz!", show_alert=True)
 
-# ----------------- AI RASM VA STIKER YARATISH -----------------
+# ----------------- AI GENERATSIYA -----------------
 
 @dp.message(F.text & ~F.text.startswith("/"))
 async def generate_ai_handler(message: types.Message):
     user_prompt = message.text.strip()
     
-    # Menyu tugmasi bo'lsa AI ishlamaydi
-    if user_prompt in MENU_BUTTONS:
+    if user_prompt in [
+        "🎨 AI Rasm Yaratish 🚀", "💡 Tasodifiy G'oya ✨", "🏆 TOP-10 Liderlar ⭐️",
+        "📊 Mening Statistikam 📈", "ℹ️ Bot Haqida 🤖", "📢 Kanallarni Boshqarish ⚙️",
+        "📊 Umumiy Statistika 📈", "📣 Reklama Tarqatish 🚀", "💾 Bazani Yuklab Olish 📥",
+        "👤 Foydalanuvchi Rejimiga O'tish ⬅️", "❌ Bekor Qilish"
+    ]:
         return
 
     if AIService.is_nsfw(user_prompt):
@@ -671,14 +650,12 @@ async def generate_ai_handler(message: types.Message):
         
         bot_info = await data_bot.get_me()
         
-        # 1. Rasmni yuborish
         await message.answer_photo(
             photo=BufferedInputFile(img_bytes.read(), filename="ai_image.png"),
             caption=f"🖼 **So'rovingiz:** `{user_prompt}`\n⚙️ **Engine:** `{engine_name}`\n\n✨ Botimiz: @{bot_info.username}",
             parse_mode="Markdown"
         )
         
-        # 2. Stikerni yuborish
         await message.answer_sticker(
             sticker=BufferedInputFile(sticker_bytes.read(), filename="sticker.webp")
         )
@@ -688,7 +665,7 @@ async def generate_ai_handler(message: types.Message):
 
 
 # ==============================================================================
-# 8. BOTNI ISHGA TUSHIRISH
+# 8. ISHGA TUSHIRISH
 # ==============================================================================
 
 async def main():
@@ -700,7 +677,7 @@ async def main():
     asyncio.create_task(start_web_server())
     asyncio.create_task(self_ping_loop())
     
-    logger.info("🚀 Production Bot va Web Server ishga tushdi!")
+    logger.info("🚀 Bot va Web Server ishga tushdi!")
     
     try:
         await dp.start_polling(data_bot)
