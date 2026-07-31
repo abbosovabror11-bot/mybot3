@@ -11,6 +11,7 @@ import aiohttp
 import aiosqlite
 from PIL import Image
 from cachetools import TTLCache
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, StateFilter, CommandStart
@@ -38,10 +39,14 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAGxdKm-7d6cjFet5hnk2OD5Lu5h6T_7T
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
-# Majburiy obuna kanallari ro'yxati
+# Render.com tomonidan beriladigan Port va URL
+PORT = int(os.getenv("PORT", 8080))
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "") # Masalan: https://my-bot.onrender.com
+
+# Majburiy obuna kanallari
 CHANNELS = [
     {
-        "id": -1001234567890,           # Telegram kanal ID (-100 bilan boshlanadi)
+        "id": -1001234567890,           # Kanal ID (-100 bilan)
         "url": "https://t.me/kanal1",  # Kanal havolasi
         "title": "📢 1-Asosiy Kanal"
     }
@@ -49,11 +54,12 @@ CHANNELS = [
 
 DATABASE_PATH = "bot_data.db"
 
-# Kesh tizimi (Kanallarga obunani 2 daqiqa keshlaydi)
+# Keshlar
 sub_cache = TTLCache(maxsize=20000, ttl=120)
-
-# Anti-spam kesh (Foydalanuvchi har 5 sekundda 1 marta rasm so'ray oladi)
 user_cooldown = TTLCache(maxsize=20000, ttl=5)
+
+# Badwords / NSFW kontent filtri
+NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,13 +70,12 @@ logger = logging.getLogger("ProductionAIBot")
 
 
 # ==============================================================================
-# 2. MA'LUMOTLAR BAZASI BILAN ISHLASH (SQLITE ASYNC)
+# 2. MA'LUMOTLAR BAZASI (SQLITE ASYNC)
 # ==============================================================================
 
 class Database:
     @staticmethod
     async def init_db():
-        """Baza jadvallarini yaratish va optimallashtirish"""
         async with aiosqlite.connect(DATABASE_PATH) as db:
             await db.execute("PRAGMA journal_mode=WAL;")
             await db.execute("PRAGMA synchronous=NORMAL;")
@@ -89,7 +94,6 @@ class Database:
 
     @staticmethod
     async def add_user(user_id: int, full_name: str, username: str):
-        """Yangi foydalanuvchi qo'shish yoki uning ma'lumotlarini yangilash"""
         async with aiosqlite.connect(DATABASE_PATH) as db:
             await db.execute("""
                 INSERT INTO users (user_id, full_name, username, is_active) 
@@ -103,7 +107,6 @@ class Database:
 
     @staticmethod
     async def increment_generation(user_id: int):
-        """Generatsiyalar sonini oshirish"""
         async with aiosqlite.connect(DATABASE_PATH) as db:
             await db.execute(
                 "UPDATE users SET generations_count = generations_count + 1 WHERE user_id = ?",
@@ -113,7 +116,6 @@ class Database:
 
     @staticmethod
     async def set_user_active(user_id: int, is_active: bool):
-        """Foydalanuvchi botni bloklaganini belgilash"""
         async with aiosqlite.connect(DATABASE_PATH) as db:
             await db.execute(
                 "UPDATE users SET is_active = ? WHERE user_id = ?",
@@ -123,7 +125,6 @@ class Database:
 
     @staticmethod
     async def get_top_users(limit: int = 10) -> List[Tuple[str, int]]:
-        """Eng faol foydalanuvchilar ro'yxati"""
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute(
                 "SELECT full_name, generations_count FROM users WHERE is_active = 1 ORDER BY generations_count DESC LIMIT ?",
@@ -133,7 +134,6 @@ class Database:
 
     @staticmethod
     async def get_user_stats(user_id: int) -> int:
-        """Foydalanuvchi statistikasini olish"""
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT generations_count FROM users WHERE user_id = ?", (user_id,)) as cursor:
                 row = await cursor.fetchone()
@@ -141,7 +141,6 @@ class Database:
 
     @staticmethod
     async def get_all_user_ids() -> List[int]:
-        """Barcha aktiv foydalanuvchilar ID ro'yxati"""
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT user_id FROM users WHERE is_active = 1") as cursor:
                 rows = await cursor.fetchall()
@@ -149,7 +148,6 @@ class Database:
 
     @staticmethod
     async def get_system_stats() -> Tuple[int, int, int]:
-        """Tizim umumiy statistikasi (Jami, Aktiv, Generatsiyalar)"""
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT COUNT(*), SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), SUM(generations_count) FROM users") as cursor:
                 row = await cursor.fetchone()
@@ -160,7 +158,7 @@ class Database:
 
 
 # ==============================================================================
-# 3. INTERFEYS VA TUGMALAR (KEYBOARDS)
+# 3. KEYBOARDS
 # ==============================================================================
 
 class Keyboards:
@@ -194,11 +192,10 @@ class Keyboards:
 
 
 # ==============================================================================
-# 4. MIDDLEWARES (OBUNA FILTR VA ANTI-SPAM)
+# 4. MIDDLEWARES
 # ==============================================================================
 
 class MultiChannelSubMiddleware(types.TelegramObject):
-    """Kanallarga majburiy obuna filtratori"""
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -215,14 +212,13 @@ class MultiChannelSubMiddleware(types.TelegramObject):
             return await handler(event, data)
 
         unsubscribed_channels = []
-
         for ch in CHANNELS:
             try:
                 member = await bot.get_chat_member(chat_id=ch["id"], user_id=user.id)
                 if member.status not in ["creator", "administrator", "member"]:
                     unsubscribed_channels.append(ch)
             except Exception as e:
-                logger.warning(f"Kanal a'zoligini tekshirishda xatolik: {ch['id']} - {e}")
+                logger.warning(f"Kanal a'zoligi xatosi: {ch['id']} - {e}")
 
         if not unsubscribed_channels:
             sub_cache[user.id] = True
@@ -250,7 +246,6 @@ class MultiChannelSubMiddleware(types.TelegramObject):
 
 
 class AntiSpamMiddleware(types.TelegramObject):
-    """Foydalanuvchilarning ketma-ket spamingining oldini olish"""
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -270,12 +265,19 @@ class AntiSpamMiddleware(types.TelegramObject):
         return await handler(event, data)
 
 
-# ================== 5. XIZMATLAR (AI, TRANSLATE & STICKER PROCESSOR) ==================
+# ==============================================================================
+# 5. AI XIZMATLARI VA SHTIKER PROCESSOR
+# ==============================================================================
 
 class AIService:
     @staticmethod
+    def is_nsfw(text: str) -> bool:
+        """Taqiqlangan so'zlarni tekshirish"""
+        text_lower = text.lower()
+        return any(word in text_lower for word in NSFW_WORDS)
+
+    @staticmethod
     async def translate_to_english(text: str) -> str:
-        """O'zbek matnini avtomatik ingliz tiliga o'girish"""
         try:
             encoded_text = urllib.parse.quote(text)
             url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q={encoded_text}"
@@ -290,10 +292,9 @@ class AIService:
 
     @staticmethod
     async def generate_image(prompt: str) -> Tuple[BytesIO | None, str]:
-        """3 Bosqichli zaxira tizimi orqali AI rasm generatsiyasi"""
         encoded_prompt = urllib.parse.quote(prompt)
         
-        # 1-Bosqich: Pollinations AI (HD Prompt Engine)
+        # 1-Bosqich: Pollinations AI
         url1 = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -305,7 +306,7 @@ class AIService:
         except Exception as e:
             logger.warning(f"1-API ishlamadi: {e}")
 
-        # 2-Bosqich: Lexica API (Zaxira)
+        # 2-Bosqich: Lexica API
         url2 = f"https://lexica.art/api/v1/search?q={encoded_prompt}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -320,21 +321,10 @@ class AIService:
         except Exception as e:
             logger.warning(f"2-API ishlamadi: {e}")
 
-        # 3-Bosqich: Unsplash Direct Engine (Eng oxirgi zaxira)
-        url3 = f"https://source.unsplash.com/1024x1024/?{encoded_prompt}"
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url3, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        return BytesIO(await resp.read()), "Unsplash Engine"
-        except Exception as e:
-            logger.error(f"3-API ham ishlamadi: {e}")
-
         return None, "Xatolik"
 
     @staticmethod
     def create_sticker(image_bytes: BytesIO) -> BytesIO:
-        """Rasmni stiker formatiga (WEBP 512x512) convert qilish"""
         image_bytes.seek(0)
         img = Image.open(image_bytes).convert("RGBA")
         img.thumbnail((512, 512))
@@ -346,7 +336,47 @@ class AIService:
 
 
 # ==============================================================================
-# 6. HANDLERLAR VA FSM
+# 6. WEB SERVER & KEEP-ALIVE SYSTEM (RENDER UXLAMASLIGI UCHUN)
+# ==============================================================================
+
+async def handle_ping(request):
+    """Render yoki UptimeRobot uchun 200 OK qaytaradi"""
+    return web.Response(text="Bot is live and running 24/7!", status=200)
+
+async def start_web_server():
+    """Aiohttp Web Serverni ishga tushirish"""
+    app = web.Application()
+    app.router.add_get("/", handle_ping)
+    app.router.add_get("/ping", handle_ping)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    logger.info(f"🌐 Web Server {PORT}-portda ishga tushdi!")
+
+async def self_ping_loop():
+    """Bot o'z-o'ziga so'rov yuborib uxlab qolishining oldini oladi (Har 4 daqiqada)"""
+    await asyncio.sleep(10)
+    if not RENDER_EXTERNAL_URL:
+        logger.info("ℹ️ RENDER_EXTERNAL_URL belgilanmagan, o'z-o'zini pingleydi emas.")
+        return
+
+    ping_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/ping"
+    logger.info(f"🔄 Auto-ping yoqildi: {ping_url}")
+    
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(ping_url, timeout=10) as resp:
+                    logger.info(f"⏰ Keep-alive ping bajarildi: Status {resp.status}")
+        except Exception as e:
+            logger.warning(f"Ping xatosi: {e}")
+        await asyncio.sleep(240)  # Har 4 daqiqada ping yuboradi
+
+
+# ==============================================================================
+# 7. HANDLERLAR
 # ==============================================================================
 
 class AdminState(StatesGroup):
@@ -354,7 +384,6 @@ class AdminState(StatesGroup):
 
 dp = Dispatcher(storage=MemoryStorage())
 
-# Middlewares bog'lash
 sub_mw = MultiChannelSubMiddleware()
 anti_spam_mw = AntiSpamMiddleware()
 
@@ -374,8 +403,8 @@ async def start_handler(message: types.Message, state: FSMContext):
     kb = Keyboards.get_admin_main() if message.from_user.id in ADMINS else Keyboards.get_user_main()
     
     await message.answer(
-        "✨ **Mutlaqo Bepul Professional AI Botiga Xush Kelibsiz!**\n\n"
-        "Manga istalgan matningizni yuboring (Masalan: *Dengiz bo'yidagi koinot kemasi*), men unga mos **HD Rasm** hamda **Stiker** tayyorlab beraman!",
+        "✨ **Professional AI Botiga Xush Kelibsiz!**\n\n"
+        "Manga istalgan matningizni yuboring (Masalan: *Dengiz bo'yidagi kelajak shahri*), men unga mos **HD Rasm** hamda **Stiker** tayyorlab beraman!",
         reply_markup=kb,
         parse_mode="Markdown"
     )
@@ -402,7 +431,7 @@ async def admin_stats(message: types.Message):
 @dp.message(F.text == "📢 Reklama Tarqatish", F.from_user.id.in_(ADMINS))
 async def start_broadcast(message: types.Message, state: FSMContext):
     await state.set_state(AdminState.waiting_for_broadcast)
-    await message.answer("📢 **Reklama postini yuboring (Rasm, Matn, Video va b.):**", reply_markup=Keyboards.get_cancel())
+    await message.answer("📢 **Reklama postini yuboring:**", reply_markup=Keyboards.get_cancel())
 
 @dp.message(F.text == "❌ Bekor Qilish", StateFilter(AdminState.waiting_for_broadcast))
 async def cancel_broadcast(message: types.Message, state: FSMContext):
@@ -426,7 +455,7 @@ async def process_broadcast(message: types.Message, state: FSMContext):
             await Database.set_user_active(uid, False)
 
     await message.answer(
-        f"✅ **Reklama yakunlandi!**\n\n🟢 Muvaffaqiyatli: `{success}`\n🔴 Yetib bormadi (Bloklangan): `{failed}`",
+        f"✅ **Reklama yakunlandi!**\n\n🟢 Muvaffaqiyatli: `{success}`\n🔴 Yetib bormadi: `{failed}`",
         reply_markup=Keyboards.get_admin_main(),
         parse_mode="Markdown"
     )
@@ -435,9 +464,9 @@ async def process_broadcast(message: types.Message, state: FSMContext):
 async def download_db(message: types.Message):
     if os.path.exists(DATABASE_PATH):
         db_file = FSInputFile(DATABASE_PATH)
-        await message.answer_document(document=db_file, caption="💾 **Ma'lumotlar bazasining zaxira fayli.**")
+        await message.answer_document(document=db_file, caption="💾 **Ma'lumotlar bazasi.**")
     else:
-        await message.answer("❌ Baza fayli topilmadi.")
+        await message.answer("❌ Baza topilmadi.")
 
 @dp.message(F.text == "🏆 TOP-10 Liderlar")
 async def show_top(message: types.Message):
@@ -485,20 +514,21 @@ async def check_sub_handler(callback: types.CallbackQuery):
 async def generate_ai_handler(message: types.Message):
     user_prompt = message.text.strip()
     
+    # NSFW Tekshirish
+    if AIService.is_nsfw(user_prompt):
+        await message.answer("⚠️ **Kechirasiz! Botda nojo'ya va taqiqlangan mazmundagi rasmlarni yaratish cheklangan.**")
+        return
+
     async with ChatActionSender.upload_photo(bot=data_bot, chat_id=message.chat.id):
         status_msg = await message.answer("🎨 *AI rasmingizni chizmoqda... Biroz kutib turing.*", parse_mode="Markdown")
         
-        # O'zbek tilidan Ingliz tiliga o'girish
         en_prompt = await AIService.translate_to_english(user_prompt)
-        
-        # AI Orqali rasm yaratish
         img_bytes, engine_name = await AIService.generate_image(en_prompt)
 
         if not img_bytes:
-            await status_msg.edit_text("❌ Serverlar hozirda juda band. Iltimos, 1 minutdan so'ng qayta urinib ko'ring.")
+            await status_msg.edit_text("❌ Serverlar hozirda band. Iltimos, 1 minutdan so'ng qayta urinib ko'ring.")
             return
 
-        # Stiker yaratish
         sticker_bytes = AIService.create_sticker(img_bytes)
         img_bytes.seek(0)
         
@@ -516,7 +546,7 @@ async def generate_ai_handler(message: types.Message):
 
 
 # ==============================================================================
-# 7. BOTNI ISHGA TUSHIRISH (MAIN ENTRYPOINT)
+# 8. BOTNI ISHGA TUSHIRISH
 # ==============================================================================
 
 async def main():
@@ -524,7 +554,12 @@ async def main():
     data_bot = Bot(token=BOT_TOKEN)
     
     await Database.init_db()
-    logger.info("🚀 Production Bot Muvaffaqiyatli Ishga Tushdi!")
+    
+    # Web server va Auto-ping vazifalarini fonda yurgizish
+    asyncio.create_task(start_web_server())
+    asyncio.create_task(self_ping_loop())
+    
+    logger.info("🚀 Production Bot va Web Server ishga tushdi!")
     
     try:
         await dp.start_polling(data_bot)
