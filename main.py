@@ -39,17 +39,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAGxdKm-7d6cjFet5hnk2OD5Lu5h6T_7T
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
-# RENDERDA O'CHIB KETMAYDIGAN KANAL MA'LUMOTLARI (SHU YERGA YOZING YOKI ENV ULANING):
-# Format: "KANAL_ID|KANAL_NOMI|LINK"
-# Agar 2 ta bo'lsa vergul bilan: "-100123|Kanal1|link1, -100456|Kanal2|link2"
-CHANNELS_ENV = os.getenv("CHANNELS", "")
-
 PORT = int(os.getenv("PORT", 8080))
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 DATABASE_PATH = "bot_data.db"
-
-sub_cache = TTLCache(maxsize=20000, ttl=60)
-user_cooldown = TTLCache(maxsize=20000, ttl=4)
 
 NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
 
@@ -175,25 +167,9 @@ class Database:
 
     @staticmethod
     async def get_channels() -> List[Tuple[int, str, str]]:
-        db_channels = []
         async with aiosqlite.connect(DATABASE_PATH) as db:
             async with db.execute("SELECT channel_id, title, invite_link FROM channels") as cursor:
-                db_channels = await cursor.fetchall()
-        
-        # Agar ENV faylda kanallar kiritilgan bo'lsa ularni qo'shish
-        env_channels = []
-        if CHANNELS_ENV:
-            try:
-                for item in CHANNELS_ENV.split(","):
-                    parts = item.strip().split("|")
-                    if len(parts) == 3:
-                        env_channels.append((int(parts[0]), parts[1], parts[2]))
-            except Exception as e:
-                logger.error(f"CHANNELS ENV xatosi: {e}")
-
-        # Dublikatlarni tozalash
-        all_channels = {ch[0]: ch for ch in (db_channels + env_channels)}
-        return list(all_channels.values())
+                return await cursor.fetchall()
 
 
 # ==============================================================================
@@ -232,7 +208,7 @@ class Keyboards:
 
 
 # ==============================================================================
-# 4. MIDDLEWARES (QAT'IY OBUNA TEKSHIRUVI)
+# 4. MIDDLEWARES (MAJBURiY OBUNA TEKSHIRUVI)
 # ==============================================================================
 
 class MultiChannelSubMiddleware(types.TelegramObject):
@@ -245,15 +221,12 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         bot: Bot = data['bot']
         user: types.User = data.get('event_from_user')
 
+        # Adminlar uchun tekshiruv yo'q
         if not user or user.id in ADMINS:
             return await handler(event, data)
 
-        # "Obunani tekshirish" tugmasiga to'g'ridan-to'g'ri o'tkazish
+        # "Tekshirish" tugmasi bosilganda o'tkazib yuboramiz
         if isinstance(event, CallbackQuery) and event.data == "check_sub":
-            return await handler(event, data)
-
-        # Keshni tekshirish
-        if sub_cache.get(user.id) is True:
             return await handler(event, data)
 
         channels = await Database.get_channels()
@@ -267,45 +240,23 @@ class MultiChannelSubMiddleware(types.TelegramObject):
                 if member.status in ["left", "kicked"]:
                     unsubscribed_channels.append((title, link))
             except Exception as e:
-                logger.warning(f"Kanal tekshirishda xatolik: ID: {ch_id} - Xatolik: {e}")
+                logger.warning(f"Kanalni tekshirishda xatolik (ID: {ch_id}): {e}")
 
-        if not unsubscribed_channels:
-            sub_cache[user.id] = True
-            return await handler(event, data)
+        if unsubscribed_channels:
+            keyboard = []
+            for title, link in unsubscribed_channels:
+                keyboard.append([InlineKeyboardButton(text=f"📢 {title}", url=link)])
+            
+            keyboard.append([InlineKeyboardButton(text="✅ Obunani Tekshirish", callback_data="check_sub")])
+            kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
+            text = "⚠️ **Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:**"
 
-        # Obunasi bo'lmasa xabar va tugmalarni chiqarish
-        keyboard = []
-        for title, link in unsubscribed_channels:
-            keyboard.append([InlineKeyboardButton(text=f"📢 {title}", url=link)])
-        
-        keyboard.append([InlineKeyboardButton(text="✅ Obunani Tekshirish", callback_data="check_sub")])
-        kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
-        text = "🎁 **Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:**"
-
-        if isinstance(event, Message):
-            await event.answer(text, reply_markup=kb, parse_mode="Markdown")
-        elif isinstance(event, CallbackQuery):
-            await event.message.answer(text, reply_markup=kb, parse_mode="Markdown")
-            await event.answer()
-        return
-
-
-class AntiSpamMiddleware(types.TelegramObject):
-    async def __call__(
-        self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
-        data: Dict[str, Any]
-    ) -> Any:
-        user: types.User = data.get('event_from_user')
-        if not user or user.id in ADMINS:
-            return await handler(event, data)
-
-        if isinstance(event, Message) and event.text and not event.text.startswith("/"):
-            if user_cooldown.get(user.id):
-                await event.answer("⏳ **Iltimos, biroz kutib turing!** Ketma-ket so'rov yubormang.", parse_mode="Markdown")
-                return
-            user_cooldown[user.id] = True
+            if isinstance(event, Message):
+                await event.answer(text, reply_markup=kb, parse_mode="Markdown")
+            elif isinstance(event, CallbackQuery):
+                await event.message.answer(text, reply_markup=kb, parse_mode="Markdown")
+                await event.answer()
+            return
 
         return await handler(event, data)
 
@@ -344,7 +295,7 @@ class AIService:
                     if resp.status == 200:
                         data = await resp.read()
                         if len(data) > 5000:
-                            return BytesIO(data), "Pollinations AI v3"
+                            return BytesIO(data), "Pollinations AI"
         except Exception as e:
             logger.warning(f"1-API xatosi: {e}")
 
@@ -420,12 +371,10 @@ class AdminState(StatesGroup):
 
 dp = Dispatcher(storage=MemoryStorage())
 
+# Faqat majburiy obuna middleware si qoladi (Spam cheklovi olib tashlandi!)
 sub_mw = MultiChannelSubMiddleware()
-anti_spam_mw = AntiSpamMiddleware()
-
 dp.message.outer_middleware(sub_mw)
 dp.callback_query.outer_middleware(sub_mw)
-dp.message.middleware(anti_spam_mw)
 
 @dp.message(CommandStart())
 async def start_handler(message: types.Message, state: FSMContext):
@@ -482,7 +431,7 @@ async def start_add_channel(callback: types.CallbackQuery, state: FSMContext):
         "2. Kanal ma'lumotlarini quyidagi formatda yuboring:\n\n"
         "`Kanal_ID | Kanal_Nomi | Taklif_Havolasi`\n\n"
         "📌 **Misol:**\n"
-        "`-1001234567890 | Asosiy Kanal | https://t.me/kanal_nomi`",
+        "`-1002143658790 | PICTURE UZ OFFICIAL | https://t.me/picturerasmiy`",
         parse_mode="Markdown",
         reply_markup=Keyboards.get_cancel()
     )
@@ -625,7 +574,6 @@ async def check_sub_handler(callback: types.CallbackQuery, bot: Bot):
             pass
 
     if not unsubscribed_channels:
-        sub_cache[callback.from_user.id] = True
         try:
             await callback.message.delete()
         except Exception:
