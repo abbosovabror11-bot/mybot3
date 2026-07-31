@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Generator Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #0f172a; color: #fff; padding: 20px; text-align: center; }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; background: #1e293b; color: #fff; font-size: 16px; box-sizing: border-box; }
+        button { background: #6366f1; color: white; border: none; padding: 14px; width: 100%; border-radius: 8px; font-size: 18px; cursor: pointer; font-weight: bold; margin-top: 15px; }
+        button:hover { background: #4f46e5; }
+    </style>
+</head>
+<body>
+    <h2>🎨 AI Rasm Generator</h2>
+    <p>Xohlagan g'oyangizni kiriting va uslubni tanlang:</p>
+    
+    <input type="text" id="promptInput" placeholder="Masalan: Koinotdagi kema...">
+    
+    <select id="styleSelect">
+        <option value="Cyberpunk style">Cyberpunk</option>
+        <option value="Realistic 8k, photorealistic">Realistik (8K)</option>
+        <option value="Anime masterpiece">Anime</option>
+        <option value="3D Pixar style">3D Multfilm</option>
+        <option value="Fantasy magical world">Fentezi</option>
+    </select>
+
+    <button onclick="sendData()">Rasmni Yaratish 🚀</button>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+
+        function sendData() {
+            let prompt = document.getElementById('promptInput').value;
+            let style = document.getElementById('styleSelect').value;
+            if (!prompt) {
+                alert("Iltimos, matn kiriting!");
+                return;
+            }
+            let fullText = prompt + ", " + style;
+            tg.sendData(fullText);
+        }
+    </script>
+</body>
+</html>
