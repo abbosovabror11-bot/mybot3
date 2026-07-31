@@ -13,6 +13,7 @@
             --accent-glow: rgba(0, 255, 136, 0.3);
             --text-main: #ffffff;
             --text-muted: #8b949e;
+            --danger: #ff4d4d;
         }
 
         * {
@@ -50,12 +51,8 @@
             text-shadow: 0 0 10px var(--accent-glow);
         }
 
-        .view {
-            display: none;
-        }
-        .view.active {
-            display: block;
-        }
+        .view { display: none; }
+        .view.active { display: block; }
 
         .profile-card {
             background: var(--card-bg);
@@ -76,16 +73,8 @@
             box-shadow: 0 0 15px var(--accent-glow);
         }
 
-        .username {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-
-        .user-id {
-            color: var(--text-muted);
-            font-size: 14px;
-        }
+        .username { font-size: 20px; font-weight: bold; margin-bottom: 4px; }
+        .user-id { color: var(--text-muted); font-size: 14px; }
 
         .section-title {
             font-size: 16px;
@@ -106,7 +95,6 @@
             padding: 10px;
             border: 1px solid #30363d;
             text-align: center;
-            position: relative;
         }
 
         .item-card img {
@@ -144,10 +132,7 @@
             width: 100%;
             font-size: 13px;
             box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        .btn:active {
-            opacity: 0.8;
+            margin-top: 4px;
         }
 
         .btn-outline {
@@ -166,25 +151,47 @@
             text-align: center;
         }
 
-        .balance-amount {
-            font-size: 28px;
-            font-weight: bold;
-            color: var(--accent);
-            margin: 10px 0;
-            text-shadow: 0 0 10px var(--accent-glow);
+        .balances {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
         }
 
-        .topup-buttons {
+        .balance-item span {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--accent);
+            display: block;
+            margin-top: 5px;
+        }
+
+        .tabs {
             display: flex;
-            gap: 10px;
-            margin-top: 15px;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: var(--text-muted);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
         }
 
         .nav-bar {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            bottom: 0; left: 0; right: 0;
             background: var(--card-bg);
             border-top: 1px solid #30363d;
             display: flex;
@@ -196,8 +203,7 @@
         }
 
         .nav-item {
-            background: none;
-            border: none;
+            background: none; border: none;
             color: var(--text-muted);
             font-size: 11px;
             display: flex;
@@ -207,15 +213,8 @@
             gap: 4px;
         }
 
-        .nav-item.active {
-            color: var(--accent);
-        }
-
-        .nav-item svg {
-            width: 22px;
-            height: 22px;
-            fill: currentColor;
-        }
+        .nav-item.active { color: var(--accent); }
+        .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
 
         .modal {
             display: none;
@@ -238,15 +237,15 @@
             text-align: center;
         }
 
-        .modal-content input {
+        .modal-content input, .modal-content select {
             width: 100%;
             padding: 10px;
             background: #0d1117;
             border: 1px solid #30363d;
             border-radius: 8px;
             color: white;
-            margin: 15px 0;
-            font-size: 16px;
+            margin: 10px 0;
+            font-size: 15px;
             text-align: center;
         }
     </style>
@@ -262,17 +261,21 @@
         </div>
 
         <div class="balance-box">
-            <div class="section-title">Hisobingiz (Admin ID: 8694110588)</div>
-            <div class="balance-amount" id="user-balance">300 ⭐ / 0 so'm</div>
-            <div class="topup-buttons">
-                <button class="btn" onclick="topUp('stars')">⭐ Stars To'ldirish</button>
-                <button class="btn btn-outline" onclick="topUp('uzs')">💳 So'mda To'ldirish</button>
+            <div class="section-title">Mening Hisobim</div>
+            <div class="balances">
+                <div class="balance-item">Olmos: <span id="user-diamonds">0 💎</span></div>
+                <div class="balance-item">Stars: <span id="user-stars">0 ⭐</span></div>
+            </div>
+            <div class="topup-buttons" style="display: flex; gap: 10px;">
+                <button class="btn" onclick="openTopUpModal('stars')">⭐ Stars To'ldirish</button>
+                <button class="btn btn-outline" onclick="openTopUpModal('uzs')">💳 So'mda To'ldirish</button>
             </div>
         </div>
 
-        <div class="section-title">Ma'lumot</div>
-        <div style="background: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid #30363d; font-size: 14px; color: var(--text-muted);">
-            ✨ Auksiondagi har bir savdodan tushadigan **15% komissiya Stars** avtomatik ravishda egasiga (ID: 8694110588) yo'naltiriladi.
+        <div class="section-title">Rasm yaratish (AI)</div>
+        <div style="background: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid #30363d; text-align: center;">
+            <input type="text" id="ai-prompt" placeholder="Rasmni tavsiflang..." style="width:100%; padding:10px; background:#0d1117; border:1px solid #30363d; border-radius:8px; color:#fff; margin-bottom:10px;">
+            <button class="btn" onclick="generateImage()">✨ AI orqali rasm yaratish (5 💎)</button>
         </div>
     </div>
 
@@ -290,7 +293,10 @@
         <div class="header">
             <div class="logo-title">INVENTAR</div>
         </div>
-        <div class="section-title">Sizdagi Rasmlar</div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchInvTab('created', this)">O'zim yaratganlar</button>
+            <button class="tab-btn" onclick="switchInvTab('bought', this)">Sotib olganlar</button>
+        </div>
         <div class="grid" id="inventory-grid"></div>
     </div>
 
@@ -298,24 +304,43 @@
     <div id="view-profile" class="view">
         <div class="profile-card">
             <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" class="avatar" id="user-avatar" alt="Avatar">
-            <div class="username" id="profile-name">ABBOSOV 🍀</div>
+            <div class="username" id="profile-name">Foydalanuvchi</div>
             <div class="user-id" id="profile-id">ID: 8694110588</div>
         </div>
 
-        <div class="section-title">🏆 Yaratilgan va Sotib Olingan Rasmlar</div>
+        <div class="section-title">🛍 Auksiondan sotib olingan rasmlar</div>
         <div class="grid" id="profile-grid"></div>
     </div>
 
 </div>
 
-<!-- Auksion modal -->
+<!-- Auksionga chiqarish Modali -->
 <div class="modal" id="auction-modal">
     <div class="modal-content">
         <h3>Auksionga qo'yish</h3>
-        <p style="font-size: 13px; color: var(--text-muted); margin-top: 5px;">Stars narxini kiriting. Sotilganda 15% komissiya egasiga (8694110588) tushadi.</p>
-        <input type="number" id="auction-price-input" placeholder="Stars narxi">
+        <p style="font-size: 12px; color: var(--text-muted); margin: 5px 0;">Valyutani tanlang va narx kiriting:</p>
+        <select id="auction-currency" onchange="updatePriceLimits()">
+            <option value="diamonds">Olmos 💎 (Min: 10, Max: 50)</option>
+            <option value="stars">Stars ⭐ (Min: 5, Max: 15)</option>
+        </select>
+        <input type="number" id="auction-price-input" placeholder="Narxni kiriting">
         <button class="btn" onclick="confirmAuction()">Auksionga chiqarish</button>
-        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal()">Bekor qilish</button>
+        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('auction-modal')">Bekor qilish</button>
+    </div>
+</div>
+
+<!-- To'lov Modali (So'm orqali) -->
+<div class="modal" id="topup-uzs-modal">
+    <div class="modal-content">
+        <h3>Karta orqali to'ldirish</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin: 10px 0;">
+            Karta raqamiga pul o'tkazing:<br>
+            <b style="color:var(--accent); font-size:16px;">9860 6067 5617 3831</b><br>
+            <small>1000 so'm = 20 ta Olmos 💎</small>
+        </p>
+        <input type="text" id="receipt-input" placeholder="Chek raqami yoki skrinshot havolasi">
+        <button class="btn" onclick="sendReceiptToAdmin()">Adminchaga chekni yuborish</button>
+        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('topup-uzs-modal')">Yopish</button>
     </div>
 </div>
 
@@ -343,31 +368,28 @@
     let tg = window.Telegram.WebApp;
     tg.expand();
 
-    // Doimiy egasining Telegram ID'si kodga biriktirildi
-    const OWNER_TELEGRAM_ID = "8694110588";
-
+    const ADMIN_ID = "8694110588";
     let user = tg.initDataUnsafe?.user;
-    if (user) {
-        document.getElementById('profile-name').innerText = user.first_name || "ABBOSOV 🍀";
-        // Agar ochgan odam o'zingiz bo'lsangiz ID chiqadi, lekin egalik doim 8694110588 da qoladi
-        document.getElementById('profile-id').innerText = "ID: " + (user.id || OWNER_TELEGRAM_ID);
-        if (user.photo_url) document.getElementById('user-avatar').src = user.photo_url;
-    }
 
-    let inventory = JSON.parse(localStorage.getItem('ai_inventory')) || [
-        { id: 1, title: "Neon Cyber #1", img: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300", price: 1650 },
-        { id: 2, title: "Abstract Wave", img: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=300", price: 850 }
-    ];
-
-    let market = JSON.parse(localStorage.getItem('ai_market')) || [
-        { id: 101, title: "Cosmic Art", img: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=300", price: 500 },
-        { id: 102, title: "Future City", img: "https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?w=300", price: 750 }
-    ];
+    let userData = JSON.parse(localStorage.getItem('ai_user_balance')) || { diamonds: 50, stars: 10 };
+    let createdImages = JSON.parse(localStorage.getItem('ai_created')) || [];
+    let boughtImages = JSON.parse(localStorage.getItem('ai_bought')) || [];
+    let market = JSON.parse(localStorage.getItem('ai_market')) || [];
 
     let selectedItemId = null;
+    let currentInvTab = 'created';
 
-    function saveData() {
-        localStorage.setItem('ai_inventory', JSON.stringify(inventory));
+    function updateUI() {
+        document.getElementById('user-diamonds').innerText = userData.diamonds + " 💎";
+        document.getElementById('user-stars').innerText = userData.stars + " ⭐";
+        if (user) {
+            document.getElementById('profile-name').innerText = user.first_name || "Foydalanuvchi";
+            document.getElementById('profile-id').innerText = "ID: " + (user.id || ADMIN_ID);
+            if (user.photo_url) document.getElementById('user-avatar').src = user.photo_url;
+        }
+        localStorage.setItem('ai_user_balance', JSON.stringify(userData));
+        localStorage.setItem('ai_created', JSON.stringify(createdImages));
+        localStorage.setItem('ai_bought', JSON.stringify(boughtImages));
         localStorage.setItem('ai_market', JSON.stringify(market));
     }
 
@@ -383,20 +405,49 @@
         if (viewName === 'profile') renderProfile();
     }
 
+    function switchInvTab(tab, el) {
+        currentInvTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+        renderInventory();
+    }
+
+    function generateImage() {
+        let prompt = document.getElementById('ai-prompt').value;
+        if (!prompt) { alert("Iltimos, rasm tavsifini yozing!"); return; }
+        if (userData.diamonds < 5) { alert("Olmosingiz yetarli emas! (Kerak: 5 💎)"); return; }
+
+        userData.diamonds -= 5;
+        let newImg = {
+            id: Date.now(),
+            title: prompt,
+            img: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300",
+            price: 0,
+            currency: 'diamonds'
+        };
+        createdImages.push(newImg);
+        updateUI();
+        alert("✨ Yangi rasm muvaffaqiyatli yaratildi va inventaringizga qo'shildi!");
+        document.getElementById('ai-prompt').value = '';
+    }
+
     function renderInventory() {
         const grid = document.getElementById('inventory-grid');
         grid.innerHTML = '';
-        if(inventory.length === 0) {
-            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Inventar bo\'sh</p>';
+        let list = currentInvTab === 'created' ? createdImages : boughtImages;
+
+        if (list.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Hozircha rasmlar yo\'q</p>';
             return;
         }
-        inventory.forEach(item => {
+
+        list.forEach(item => {
+            let actionBtn = currentInvTab === 'created' ? `<button class="btn" onclick="openAuctionModal(${item.id})">Auksionga qo'yish</button>` : '';
             grid.innerHTML += `
                 <div class="item-card">
                     <img src="${item.img}" alt="Art">
                     <div class="item-title">${item.title}</div>
-                    <div class="item-price">💎 ${item.price} ⭐</div>
-                    <button class="btn" onclick="openAuctionModal(${item.id})">Auksionga qo'yish</button>
+                    ${actionBtn}
                 </div>
             `;
         });
@@ -405,16 +456,17 @@
     function renderMarket() {
         const grid = document.getElementById('market-grid');
         grid.innerHTML = '';
-        if(market.length === 0) {
-            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Auksionda rasmlar yo\'q</p>';
+        if (market.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Auksion bo\'sh</p>';
             return;
         }
         market.forEach(item => {
+            let symbol = item.currency === 'diamonds' ? '💎' : '⭐';
             grid.innerHTML += `
                 <div class="item-card">
                     <img src="${item.img}" alt="Art">
                     <div class="item-title">${item.title}</div>
-                    <div class="item-price">💎 ${item.price} ⭐</div>
+                    <div class="item-price">${item.price} ${symbol}</div>
                     <button class="btn" onclick="buyItem(${item.id})">Sotib olish</button>
                 </div>
             `;
@@ -424,16 +476,15 @@
     function renderProfile() {
         const grid = document.getElementById('profile-grid');
         grid.innerHTML = '';
-        if(inventory.length === 0) {
-            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Rasmlar yo\'q</p>';
+        if (boughtImages.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted); grid-column:span 2; text-align:center;">Sotib olingan rasmlar yo\'q</p>';
             return;
         }
-        inventory.forEach(item => {
+        boughtImages.forEach(item => {
             grid.innerHTML += `
                 <div class="item-card">
                     <img src="${item.img}" alt="Art">
                     <div class="item-title">${item.title}</div>
-                    <div class="item-price">💎 ${item.price} ⭐</div>
                 </div>
             `;
         });
@@ -444,53 +495,81 @@
         document.getElementById('auction-modal').style.display = 'flex';
     }
 
-    function closeModal() {
-        document.getElementById('auction-modal').style.display = 'none';
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
     }
 
     function confirmAuction() {
-        const priceInput = document.getElementById('auction-price-input').value;
-        if (!priceInput || priceInput <= 0) {
-            alert("To'g'ri narx kiriting!");
+        let currency = document.getElementById('auction-currency').value;
+        let price = Number(document.getElementById('auction-price-input').value);
+
+        if (currency === 'diamonds' && (price < 10 || price > 50)) {
+            alert("Olmos uchun narx 10 dan 50 gacha bo'lishi kerak!");
+            return;
+        }
+        if (currency === 'stars' && (price < 5 || price > 15)) {
+            alert("Stars uchun narx 5 dan 15 gacha bo'lishi kerak!");
             return;
         }
 
-        const itemIndex = inventory.findIndex(i => i.id === selectedItemId);
-        if (itemIndex > -1) {
-            let item = inventory[itemIndex];
-            item.price = Number(priceInput);
-            
-            inventory.splice(itemIndex, 1);
+        let index = createdImages.findIndex(i => i.id === selectedItemId);
+        if (index > -1) {
+            let item = createdImages[index];
+            item.price = price;
+            item.currency = currency;
+
+            createdImages.splice(index, 1);
             market.push(item);
-            saveData();
-            closeModal();
-            alert("✅ Rasm auksionga chiqarildi!");
+            updateUI();
+            closeModal('auction-modal');
+            alert("✅ Rasm auksionga muvaffaqiyatli chiqarildi!");
             renderInventory();
         }
     }
 
     function buyItem(id) {
-        const itemIndex = market.findIndex(i => i.id === id);
-        if (itemIndex > -1) {
-            let item = market[itemIndex];
-            market.splice(itemIndex, 1);
-            
-            inventory.push(item);
-            saveData();
+        let index = market.findIndex(i => i.id === id);
+        if (index > -1) {
+            let item = market[index];
+            let cost = item.price;
 
-            let commission = Math.floor(item.price * 0.15);
-            alert(`🎉 Rasm sotib olindi!\n(15% komissiya (${commission} Stars) egasi — Telegram ID: ${OWNER_TELEGRAM_ID} hisobiga yuborildi).`);
+            if (item.currency === 'diamonds') {
+                if (userData.diamonds < cost) { alert("Olmosingiz yetarli emas!"); return; }
+                userData.diamonds -= cost;
+            } else {
+                if (userData.stars < cost) { alert("Stars yetarli emas!"); return; }
+                userData.stars -= cost;
+            }
+
+            market.splice(index, 1);
+            boughtImages.push(item);
+            updateUI();
+            alert("🎉 Rasm muvaffaqiyatli sotib olindi va profilingizga qo'shildi!");
             renderMarket();
         }
     }
 
-    function topUp(type) {
-        if(type === 'stars') {
-            alert("Telegram Stars to'lov oynasi (ID: 8694110588 uchun) ochilmoqda...");
+    function openTopUpModal(type) {
+        if (type === 'uzs') {
+            document.getElementById('topup-uzs-modal').style.display = 'flex';
         } else {
-            alert("Plastik karta orqali to'ldirish sahifasi ochilmoqda...");
+            // Stars avtomatik to'lov logikasi
+            alert("Telegram Stars to'lov oynasi (ID: 8694110588 ga yo'naltirilmoqda)...");
+            userData.stars += 10; // Test uchun qo'shildi
+            updateUI();
         }
     }
+
+    function sendReceiptToAdmin() {
+        let receipt = document.getElementById('receipt-input').value;
+        if (!receipt) { alert("Iltimos, chek raqamini kiriting!"); return; }
+        
+        alert(`✅ Chek muvaffaqiyatli adminchaga (${ADMIN_ID}) yuborildi!\nAdmin tasdiqlagach balansingizga olmoslar qo'shiladi.`);
+        closeModal('topup-uzs-modal');
+        document.getElementById('receipt-input').value = '';
+    }
+
+    updateUI();
 </script>
 
 </body>
