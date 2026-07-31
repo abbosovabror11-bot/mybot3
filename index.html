@@ -13,7 +13,6 @@
             --accent-glow: rgba(0, 255, 136, 0.3);
             --text-main: #ffffff;
             --text-muted: #8b949e;
-            --danger: #ff4d4d;
         }
 
         * {
@@ -248,6 +247,48 @@
             font-size: 15px;
             text-align: center;
         }
+
+        /* Kamera va fayl yuklash tugmasi dizayni */
+        .upload-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .camera-btn {
+            background: #21262d;
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            width: 45px;
+            height: 43px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            box-shadow: 0 0 5px var(--accent-glow);
+        }
+
+        .camera-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: var(--accent);
+        }
+
+        .file-name-display {
+            flex-grow: 1;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 10px;
+            color: var(--text-muted);
+            font-size: 13px;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
 </head>
 <body>
@@ -267,8 +308,8 @@
                 <div class="balance-item">Stars: <span id="user-stars">0 ⭐</span></div>
             </div>
             <div class="topup-buttons" style="display: flex; gap: 10px;">
-                <button class="btn" onclick="openTopUpModal('stars')">⭐ Stars To'ldirish</button>
-                <button class="btn btn-outline" onclick="openTopUpModal('uzs')">💳 So'mda To'ldirish</button>
+                <button class="btn" onclick="openModal('topup-stars-modal')">⭐ Stars To'ldirish</button>
+                <button class="btn btn-outline" onclick="openModal('topup-uzs-modal')">💳 So'mda To'ldirish</button>
             </div>
         </div>
 
@@ -329,7 +370,7 @@
     </div>
 </div>
 
-<!-- To'lov Modali (So'm orqali) -->
+<!-- So'm orqali to'ldirish Modali (Kamera tugmasi bilan) -->
 <div class="modal" id="topup-uzs-modal">
     <div class="modal-content">
         <h3>Karta orqali to'ldirish</h3>
@@ -338,9 +379,33 @@
             <b style="color:var(--accent); font-size:16px;">9860 6067 5617 3831</b><br>
             <small>1000 so'm = 20 ta Olmos 💎</small>
         </p>
-        <input type="text" id="receipt-input" placeholder="Chek raqami yoki skrinshot havolasi">
-        <button class="btn" onclick="sendReceiptToAdmin()">Adminchaga chekni yuborish</button>
+
+        <!-- Kamera va rasm yuklash qismi -->
+        <div class="upload-container">
+            <input type="file" id="receipt-file-input" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+            <button class="camera-btn" onclick="document.getElementById('receipt-file-input').click()" title="Chek skrinshotini yuklash">
+                <!-- Kamera ikonchasi -->
+                <svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm8 3c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>
+            </button>
+            <div class="file-name-display" id="file-name-text">Chek skrinshotini tanlang...</div>
+        </div>
+
+        <button class="btn" onclick="sendReceiptToAdmin('uzs')">Adminchaga chekni yuborish</button>
         <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('topup-uzs-modal')">Yopish</button>
+    </div>
+</div>
+
+<!-- Stars orqali to'ldirish Modali -->
+<div class="modal" id="topup-stars-modal">
+    <div class="modal-content">
+        <h3>Stars To'ldirish</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin: 10px 0;">
+            Nechta Stars to'ldirmoqchisiz?<br>
+            <small>(Minimum: 1 ta, Maksimum: 100 ta)</small>
+        </p>
+        <input type="number" id="stars-amount-input" placeholder="Stars miqdori (1 - 100)" min="1" max="100">
+        <button class="btn" onclick="sendReceiptToAdmin('stars')">Tasdiqlash va Adminga yuborish</button>
+        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('topup-stars-modal')">Yopish</button>
     </div>
 </div>
 
@@ -371,13 +436,14 @@
     const ADMIN_ID = "8694110588";
     let user = tg.initDataUnsafe?.user;
 
-    let userData = JSON.parse(localStorage.getItem('ai_user_balance')) || { diamonds: 50, stars: 10 };
+    let userData = JSON.parse(localStorage.getItem('ai_user_balance')) || { diamonds: 50, stars: 20 };
     let createdImages = JSON.parse(localStorage.getItem('ai_created')) || [];
     let boughtImages = JSON.parse(localStorage.getItem('ai_bought')) || [];
     let market = JSON.parse(localStorage.getItem('ai_market')) || [];
 
     let selectedItemId = null;
     let currentInvTab = 'created';
+    let uploadedFileObj = null;
 
     function updateUI() {
         document.getElementById('user-diamonds').innerText = userData.diamonds + " 💎";
@@ -495,8 +561,21 @@
         document.getElementById('auction-modal').style.display = 'flex';
     }
 
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = 'flex';
+    }
+
     function closeModal(modalId) {
         document.getElementById(modalId).style.display = 'none';
+    }
+
+    function handleFileSelect(event) {
+        let file = event.target.files[0];
+        if (file) {
+            uploadedFileObj = file;
+            document.getElementById('file-name-text').innerText = file.name;
+            document.getElementById('file-name-text').style.color = "var(--accent)";
+        }
     }
 
     function confirmAuction() {
@@ -549,24 +628,32 @@
         }
     }
 
-    function openTopUpModal(type) {
+    function sendReceiptToAdmin(type) {
         if (type === 'uzs') {
-            document.getElementById('topup-uzs-modal').style.display = 'flex';
-        } else {
-            // Stars avtomatik to'lov logikasi
-            alert("Telegram Stars to'lov oynasi (ID: 8694110588 ga yo'naltirilmoqda)...");
-            userData.stars += 10; // Test uchun qo'shildi
-            updateUI();
-        }
-    }
+            if (!uploadedFileObj) { 
+                alert("Iltimos, kamera tugmasini bosib chek skrinshotini tanlang!"); 
+                return; 
+            }
+            
+            // Adminga yo'naltirish
+            let adminLink = `https://t.me/c/${ADMIN_ID}?text=Karta%20orqali%20to'lov%20cheki%20yuklandi`;
+            alert(`✅ Chek skrinshoti adminga (${ADMIN_ID}) yuborildi! Admin tasdiqlagach olmos qo'shiladi.`);
+            
+            closeModal('topup-uzs-modal');
+            uploadedFileObj = null;
+            document.getElementById('file-name-text').innerText = "Chek skrinshotini tanlang...";
+            document.getElementById('file-name-text').style.color = "var(--text-muted)";
+        } else if (type === 'stars') {
+            let starsVal = Number(document.getElementById('stars-amount-input').value);
+            if (!starsVal || starsVal < 1 || starsVal > 100) {
+                alert("Iltimos, 1 dan 100 gacha bo'lgan Stars miqdorini kiriting!");
+                return;
+            }
 
-    function sendReceiptToAdmin() {
-        let receipt = document.getElementById('receipt-input').value;
-        if (!receipt) { alert("Iltimos, chek raqamini kiriting!"); return; }
-        
-        alert(`✅ Chek muvaffaqiyatli adminchaga (${ADMIN_ID}) yuborildi!\nAdmin tasdiqlagach balansingizga olmoslar qo'shiladi.`);
-        closeModal('topup-uzs-modal');
-        document.getElementById('receipt-input').value = '';
+            alert(`✅ ${starsVal} ta Stars uchun to'lov so'rovi adminga (${ADMIN_ID}) yuborildi! Tasdiqlangach balansingizga qo'shiladi.`);
+            closeModal('topup-stars-modal');
+            document.getElementById('stars-amount-input').value = '';
+        }
     }
 
     updateUI();
