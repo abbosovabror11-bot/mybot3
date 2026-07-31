@@ -39,18 +39,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAGxdKm-7d6cjFet5hnk2OD5Lu5h6T_7T
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
-# Render.com tomonidan beriladigan Port va URL
 PORT = int(os.getenv("PORT", 8080))
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "") # Masalan: https://my-bot.onrender.com
-
-# Majburiy obuna kanallari
-CHANNELS = [
-    {
-        "id": -1001234567890,           # Kanal ID (-100 bilan)
-        "url": "https://t.me/kanal1",  # Kanal havolasi
-        "title": "📢 1-Asosiy Kanal"
-    }
-]
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 
 DATABASE_PATH = "bot_data.db"
 
@@ -58,7 +48,6 @@ DATABASE_PATH = "bot_data.db"
 sub_cache = TTLCache(maxsize=20000, ttl=120)
 user_cooldown = TTLCache(maxsize=20000, ttl=5)
 
-# Badwords / NSFW kontent filtri
 NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
 
 logging.basicConfig(
@@ -87,6 +76,14 @@ class Database:
                     generations_count INTEGER DEFAULT 0,
                     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     is_active INTEGER DEFAULT 1
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS channels (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_id INTEGER UNIQUE NOT NULL,
+                    title TEXT NOT NULL,
+                    invite_link TEXT NOT NULL
                 )
             """)
             await db.execute("CREATE INDEX IF NOT EXISTS idx_generations ON users(generations_count DESC);")
@@ -156,9 +153,33 @@ class Database:
                 generations = row[2] or 0
                 return total, active, generations
 
+    @staticmethod
+    async def add_channel(channel_id: int, title: str, invite_link: str):
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            await db.execute("""
+                INSERT INTO channels (channel_id, title, invite_link)
+                VALUES (?, ?, ?)
+                ON CONFLICT(channel_id) DO UPDATE SET
+                    title = excluded.title,
+                    invite_link = excluded.invite_link;
+            """, (channel_id, title, invite_link))
+            await db.commit()
+
+    @staticmethod
+    async def delete_channel(channel_id: int):
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            await db.execute("DELETE FROM channels WHERE channel_id = ?", (channel_id,))
+            await db.commit()
+
+    @staticmethod
+    async def get_channels() -> List[Tuple[int, str, str]]:
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            async with db.execute("SELECT channel_id, title, invite_link FROM channels") as cursor:
+                return await cursor.fetchall()
+
 
 # ==============================================================================
-# 3. KEYBOARDS
+# 3. YORQIN VA QULAY TUGMALAR (KEYBOARDS)
 # ==============================================================================
 
 class Keyboards:
@@ -166,9 +187,9 @@ class Keyboards:
     def get_user_main() -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="🎨 Rasm Yaratish"), KeyboardButton(text="💡 Tasodifiy G'oya")],
-                [KeyboardButton(text="🏆 TOP-10 Liderlar"), KeyboardButton(text="📊 Mening Statistikam")],
-                [KeyboardButton(text="ℹ️ Bot Haqida")]
+                [KeyboardButton(text="🎨 AI Rasm Yaratish 🚀"), KeyboardButton(text="💡 Tasodifiy G'oya ✨")],
+                [KeyboardButton(text="🏆 TOP-10 Liderlar ⭐️"), KeyboardButton(text="📊 Mening Statistikam 📈")],
+                [KeyboardButton(text="ℹ️ Bot Haqida 🤖")]
             ],
             resize_keyboard=True
         )
@@ -177,8 +198,9 @@ class Keyboards:
     def get_admin_main() -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="📈 Umumiy Statistika"), KeyboardButton(text="📢 Reklama Tarqatish")],
-                [KeyboardButton(text="💾 Bazani Yuklab Olish"), KeyboardButton(text="⬅️ Foydalanuvchi Rejimiga O'tish")]
+                [KeyboardButton(text="📢 Kanallarni Boshqarish ⚙️"), KeyboardButton(text="📊 Umumiy Statistika 📈")],
+                [KeyboardButton(text="📣 Reklama Tarqatish 🚀"), KeyboardButton(text="💾 Bazani Yuklab Olish 📥")],
+                [KeyboardButton(text="👤 Foydalanuvchi Rejimiga O'tish ⬅️")]
             ],
             resize_keyboard=True
         )
@@ -211,34 +233,39 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         if sub_cache.get(user.id) is True:
             return await handler(event, data)
 
+        channels = await Database.get_channels()
+        if not channels:
+            return await handler(event, data)
+
         unsubscribed_channels = []
-        for ch in CHANNELS:
+        for ch_id, title, link in channels:
             try:
-                member = await bot.get_chat_member(chat_id=ch["id"], user_id=user.id)
-                if member.status not in ["creator", "administrator", "member"]:
-                    unsubscribed_channels.append(ch)
+                member = await bot.get_chat_member(chat_id=ch_id, user_id=user.id)
+                if member.status in ["left", "kicked"]:
+                    unsubscribed_channels.append((title, link))
             except Exception as e:
-                logger.warning(f"Kanal a'zoligi xatosi: {ch['id']} - {e}")
+                logger.warning(f"Kanal tekshirishda xatolik: {ch_id} - {e}")
+                unsubscribed_channels.append((title, link))
 
         if not unsubscribed_channels:
             sub_cache[user.id] = True
             return await handler(event, data)
 
         keyboard = []
-        for ch in unsubscribed_channels:
-            keyboard.append([InlineKeyboardButton(text=ch["title"], url=ch["url"])])
+        for title, link in unsubscribed_channels:
+            keyboard.append([InlineKeyboardButton(text=f"📢 {title}", url=link)])
         
         keyboard.append([InlineKeyboardButton(text="✅ Obunani Tekshirish", callback_data="check_sub")])
 
         kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
-        text = "🎁 **Botdan BEPUL foydalanish uchun quyidagi kanallarga obuna bo'ling:**"
+        text = "🎁 **Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:**"
 
         if isinstance(event, Message):
             await event.answer(text, reply_markup=kb, parse_mode="Markdown")
         elif isinstance(event, CallbackQuery):
             if event.data == "check_sub":
                 sub_cache.pop(user.id, None)
-                await event.answer("🔄 Obuna qayta tekshirilmoqda...", show_alert=False)
+                await event.answer("🔄 Obuna tekshirilmoqda...", show_alert=False)
                 return await handler(event, data)
             await event.message.answer(text, reply_markup=kb, parse_mode="Markdown")
             await event.answer()
@@ -258,7 +285,7 @@ class AntiSpamMiddleware(types.TelegramObject):
 
         if isinstance(event, Message) and event.text and not event.text.startswith("/"):
             if user_cooldown.get(user.id):
-                await event.answer("⏳ **Iltimos, biroz kutib turing!** So'rovingiz qayta ishlanmoqda (5s cooldown).", parse_mode="Markdown")
+                await event.answer("⏳ **Iltimos, biroz kutib turing!** Ketma-ket so'rov yubormang.", parse_mode="Markdown")
                 return
             user_cooldown[user.id] = True
 
@@ -266,13 +293,12 @@ class AntiSpamMiddleware(types.TelegramObject):
 
 
 # ==============================================================================
-# 5. AI XIZMATLARI VA SHTIKER PROCESSOR
+# 5. AI XIZMATLARI VA STIKER TAYYORLASH
 # ==============================================================================
 
 class AIService:
     @staticmethod
     def is_nsfw(text: str) -> bool:
-        """Taqiqlangan so'zlarni tekshirish"""
         text_lower = text.lower()
         return any(word in text_lower for word in NSFW_WORDS)
 
@@ -294,7 +320,7 @@ class AIService:
     async def generate_image(prompt: str) -> Tuple[BytesIO | None, str]:
         encoded_prompt = urllib.parse.quote(prompt)
         
-        # 1-Bosqich: Pollinations AI
+        # Pollinations AI Engine
         url1 = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -306,7 +332,7 @@ class AIService:
         except Exception as e:
             logger.warning(f"1-API ishlamadi: {e}")
 
-        # 2-Bosqich: Lexica API
+        # Lexica AI Engine Backup
         url2 = f"https://lexica.art/api/v1/search?q={encoded_prompt}"
         try:
             async with aiohttp.ClientSession() as session:
@@ -325,26 +351,25 @@ class AIService:
 
     @staticmethod
     def create_sticker(image_bytes: BytesIO) -> BytesIO:
+        """ Telegram stiker formati WEBP (512x512 max) ga o'tkazish """
         image_bytes.seek(0)
         img = Image.open(image_bytes).convert("RGBA")
         img.thumbnail((512, 512))
         
         output = BytesIO()
-        img.save(output, format="WEBP", quality=90)
+        img.save(output, format="WEBP", quality=95)
         output.seek(0)
         return output
 
 
 # ==============================================================================
-# 6. WEB SERVER & KEEP-ALIVE SYSTEM (RENDER UXLAMASLIGI UCHUN)
+# 6. WEB SERVER & KEEP-ALIVE
 # ==============================================================================
 
 async def handle_ping(request):
-    """Render yoki UptimeRobot uchun 200 OK qaytaradi"""
-    return web.Response(text="Bot is live and running 24/7!", status=200)
+    return web.Response(text="Bot is live 24/7!", status=200)
 
 async def start_web_server():
-    """Aiohttp Web Serverni ishga tushirish"""
     app = web.Application()
     app.router.add_get("/", handle_ping)
     app.router.add_get("/ping", handle_ping)
@@ -353,34 +378,31 @@ async def start_web_server():
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    logger.info(f"🌐 Web Server {PORT}-portda ishga tushdi!")
+    logger.info(f"🌐 Web Server {PORT}-portda ishlamoqda!")
 
 async def self_ping_loop():
-    """Bot o'z-o'ziga so'rov yuborib uxlab qolishining oldini oladi (Har 4 daqiqada)"""
     await asyncio.sleep(10)
     if not RENDER_EXTERNAL_URL:
-        logger.info("ℹ️ RENDER_EXTERNAL_URL belgilanmagan, o'z-o'zini pingleydi emas.")
         return
 
     ping_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/ping"
-    logger.info(f"🔄 Auto-ping yoqildi: {ping_url}")
-    
     while True:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(ping_url, timeout=10) as resp:
-                    logger.info(f"⏰ Keep-alive ping bajarildi: Status {resp.status}")
+                    pass
         except Exception as e:
             logger.warning(f"Ping xatosi: {e}")
-        await asyncio.sleep(240)  # Har 4 daqiqada ping yuboradi
+        await asyncio.sleep(240)
 
 
 # ==============================================================================
-# 7. HANDLERLAR
+# 7. HANDLERLAR VA FSM
 # ==============================================================================
 
 class AdminState(StatesGroup):
     waiting_for_broadcast = State()
+    waiting_for_channel_data = State()
 
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -404,34 +426,104 @@ async def start_handler(message: types.Message, state: FSMContext):
     
     await message.answer(
         "✨ **Professional AI Botiga Xush Kelibsiz!**\n\n"
-        "Manga istalgan matningizni yuboring (Masalan: *Dengiz bo'yidagi kelajak shahri*), men unga mos **HD Rasm** hamda **Stiker** tayyorlab beraman!",
+        "Manga xohlagan so'zingizni yuboring (Masalan: *Futbol o'ynayotgan sher*), men unga mos **HD Rasm** hamda **Eksklyuziv Stiker** yaratib beraman!",
         reply_markup=kb,
         parse_mode="Markdown"
     )
 
 @dp.message(Command("admin"), F.from_user.id.in_(ADMINS))
 async def admin_panel(message: types.Message):
-    await message.answer("👑 **Admin Panelga Xush Kelibsiz!**", reply_markup=Keyboards.get_admin_main())
+    await message.answer("👑 **Admin Panelga Xush Kelibsiz!**\nQuyidagi tugmalar orqali botni to'liq boshqara olasiz:", reply_markup=Keyboards.get_admin_main())
 
-@dp.message(F.text == "⬅️ Foydalanuvchi Rejimiga O'tish")
+@dp.message(F.text == "👤 Foydalanuvchi Rejimiga O'tish ⬅️")
 async def back_to_user_mode(message: types.Message):
     await message.answer("👤 Foydalanuvchi rejimiga o'tdingiz.", reply_markup=Keyboards.get_user_main())
 
-@dp.message(F.text == "📈 Umumiy Statistika", F.from_user.id.in_(ADMINS))
+# ----------------- ADMIN: KANAL BOSHQARUVI -----------------
+
+@dp.message(F.text == "📢 Kanallarni Boshqarish ⚙️", F.from_user.id.in_(ADMINS))
+async def manage_channels(message: types.Message):
+    channels = await Database.get_channels()
+    
+    text = "⚙️ **MAJBURIY OBUNA KANALLARI:**\n\n"
+    keyboard = []
+    
+    if channels:
+        for ch_id, title, link in channels:
+            text += f"🔹 **{title}**\nID: `{ch_id}`\nHavola: {link}\n\n"
+            keyboard.append([InlineKeyboardButton(text=f"❌ O'chirish: {title}", callback_data=f"del_ch_{ch_id}")])
+    else:
+        text += "⚠️ *Hozircha hech qanday kanal ulanmagan.*\n\n"
+        
+    keyboard.append([InlineKeyboardButton(text="➕ Yangi Kanal Qo'shish", callback_data="add_channel")])
+    kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    await message.answer(text, reply_markup=kb, parse_mode="Markdown")
+
+@dp.callback_query(F.data == "add_channel", F.from_user.id.in_(ADMINS))
+async def start_add_channel(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(AdminState.waiting_for_channel_data)
+    await callback.message.answer(
+        "➕ **Yangi kanal qo'shish yo'riqnomasi:**\n\n"
+        "1. Botni kanalingizga **ADMIN** qiling.\n"
+        "2. Kanal ma'lumotlarini quyidagi formatda yuboring:\n\n"
+        "`Kanal_ID | Kanal_Nomi | Taklif_Havolasi`\n\n"
+        "📌 **Misol:**\n"
+        "`-1001234567890 | Asosiy Kanal | https://t.me/kanal_nomi`",
+        parse_mode="Markdown",
+        reply_markup=Keyboards.get_cancel()
+    )
+    await callback.answer()
+
+@dp.message(StateFilter(AdminState.waiting_for_channel_data), F.from_user.id.in_(ADMINS))
+async def process_add_channel(message: types.Message, state: FSMContext):
+    if message.text == "❌ Bekor Qilish":
+        await state.clear()
+        await message.answer("❌ Bekor qilindi.", reply_markup=Keyboards.get_admin_main())
+        return
+
+    try:
+        parts = [p.strip() for p in message.text.split("|")]
+        if len(parts) != 3:
+            await message.answer("⚠️ Format noto'g'ri. Iltimos: `Kanal_ID | Kanal_Nomi | Taklif_Havolasi` shaklida yuboring.")
+            return
+
+        ch_id = int(parts[0])
+        title = parts[1]
+        link = parts[2]
+
+        await Database.add_channel(ch_id, title, link)
+        await state.clear()
+        await message.answer(f"✅ **{title}** muvaffaqiyatli saqlandi!", reply_markup=Keyboards.get_admin_main())
+    except ValueError:
+        await message.answer("⚠️ Kanal ID raqam bo'lishi kerak (Masalan: -1001234567890).")
+    except Exception as e:
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+
+@dp.callback_query(F.data.startswith("del_ch_"), F.from_user.id.in_(ADMINS))
+async def delete_channel_handler(callback: types.CallbackQuery):
+    ch_id = int(callback.data.split("_")[2])
+    await Database.delete_channel(ch_id)
+    await callback.answer("✅ Kanal o'chirildi!", show_alert=True)
+    await callback.message.delete()
+
+# ----------------- ADMIN: STATISTIKA VA REKLAMA -----------------
+
+@dp.message(F.text == "📊 Umumiy Statistika 📈", F.from_user.id.in_(ADMINS))
 async def admin_stats(message: types.Message):
     total, active, generations = await Database.get_system_stats()
     text = (
-        f"📊 **BOTNING UMUMIY STATISTIKASI:**\n\n"
+        f"📈 **BOTNING UMUMIY STATISTIKASI:**\n\n"
         f"👥 Jami Obunachilar: `{total}` ta\n"
         f"🟢 Aktiv Foydalanuvchilar: `{active}` ta\n"
-        f"🎨 Yaratilgan Rasmlar: `{generations}` ta"
+        f"🎨 Yaratilgan AI Rasmlar: `{generations}` ta"
     )
     await message.answer(text, parse_mode="Markdown")
 
-@dp.message(F.text == "📢 Reklama Tarqatish", F.from_user.id.in_(ADMINS))
+@dp.message(F.text == "📣 Reklama Tarqatish 🚀", F.from_user.id.in_(ADMINS))
 async def start_broadcast(message: types.Message, state: FSMContext):
     await state.set_state(AdminState.waiting_for_broadcast)
-    await message.answer("📢 **Reklama postini yuboring:**", reply_markup=Keyboards.get_cancel())
+    await message.answer("📢 **Reklama postini yuboring (Rasm, Video, Matn bo'lishi mumkin):**", reply_markup=Keyboards.get_cancel())
 
 @dp.message(F.text == "❌ Bekor Qilish", StateFilter(AdminState.waiting_for_broadcast))
 async def cancel_broadcast(message: types.Message, state: FSMContext):
@@ -449,29 +541,31 @@ async def process_broadcast(message: types.Message, state: FSMContext):
         try:
             await message.copy_to(chat_id=uid)
             success += 1
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.04)
         except Exception:
             failed += 1
             await Database.set_user_active(uid, False)
 
     await message.answer(
-        f"✅ **Reklama yakunlandi!**\n\n🟢 Muvaffaqiyatli: `{success}`\n🔴 Yetib bormadi: `{failed}`",
+        f"🚀 **Reklama tarqatildi!**\n\n🟢 Yuborildi: `{success}`\n🔴 Yetib bormadi: `{failed}`",
         reply_markup=Keyboards.get_admin_main(),
         parse_mode="Markdown"
     )
 
-@dp.message(F.text == "💾 Bazani Yuklab Olish", F.from_user.id.in_(ADMINS))
+@dp.message(F.text == "💾 Bazani Yuklab Olish 📥", F.from_user.id.in_(ADMINS))
 async def download_db(message: types.Message):
     if os.path.exists(DATABASE_PATH):
         db_file = FSInputFile(DATABASE_PATH)
-        await message.answer_document(document=db_file, caption="💾 **Ma'lumotlar bazasi.**")
+        await message.answer_document(document=db_file, caption="💾 **Ma'lumotlar bazasi zaxira nusxasi.**")
     else:
         await message.answer("❌ Baza topilmadi.")
 
-@dp.message(F.text == "🏆 TOP-10 Liderlar")
+# ----------------- FOYDALANUVCHI HANDLERLARI -----------------
+
+@dp.message(F.text == "🏆 TOP-10 Liderlar ⭐️")
 async def show_top(message: types.Message):
     top_users = await Database.get_top_users(10)
-    text = "🏆 **Eng Faol TOP-10 Foydalanuvchilar:**\n\n"
+    text = "⭐️ **Eng Faol TOP-10 AI Ijodkorlar:**\n\n"
     medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
     for idx, (name, count) in enumerate(top_users):
         medal = medals[idx] if idx < len(medals) else "👤"
@@ -479,29 +573,30 @@ async def show_top(message: types.Message):
         text += f"{medal} **{safe_name}** — `{count}` ta rasm\n"
     await message.answer(text, parse_mode="Markdown")
 
-@dp.message(F.text == "📊 Mening Statistikam")
+@dp.message(F.text == "📊 Mening Statistikam 📈")
 async def user_stats(message: types.Message):
     count = await Database.get_user_stats(message.from_user.id)
-    await message.answer(f"👤 **Siz yaratgan AI rasmlar soni:** `{count}` ta", parse_mode="Markdown")
+    await message.answer(f"📊 **Siz yaratgan AI rasmlar soni:** `{count}` ta", parse_mode="Markdown")
 
-@dp.message(F.text == "💡 Tasodifiy G'oya")
+@dp.message(F.text == "💡 Tasodifiy G'oya ✨")
 async def random_idea(message: types.Message):
     ideas = [
-        "Cyberpunk uslubidagi neon chiroqlar ostidagi toshkent shahri",
-        "Koinotda suzib yurgan sehrli shisha saroy, HD 8k",
+        "Cyberpunk uslubidagi neon chiroqlar ostidagi Toshkent shahri",
+        "Koinotda suzib yurgan sehrli shisha saroy, HD 8k render",
         "O'zbekiston tog'larida joylashgan kelajak texnologiyalar shahri",
-        "Qadimgi samarqand poytaxti, fantaziya va sehrli uslubda"
+        "Toshkent metrosida kofe ichib o'tirgan multfilm qahramoni",
+        "Sehrli o'rmon ichida yonayotgan kristal shar"
     ]
     import random
     idea = random.choice(ideas)
-    await message.answer(f"💡 **G'oya:** `{idea}`\n\nUshbu matnni nusxalab botga yuboring!", parse_mode="Markdown")
+    await message.answer(f"✨ **G'oya:** `{idea}`\n\nUshbu matnni nusxalab botga yuboring!", parse_mode="Markdown")
 
-@dp.message(F.text == "🎨 Rasm Yaratish")
-@dp.message(F.text == "ℹ️ Bot Haqida")
+@dp.message(F.text == "🎨 AI Rasm Yaratish 🚀")
+@dp.message(F.text == "ℹ️ Bot Haqida 🤖")
 async def info_handler(message: types.Message):
     await message.answer(
-        "🎨 **AI Rasm va Stiker olish usuli:**\n\n"
-        "Shunchaki xohlagan tasviringizni matn ko'rinishida yuboring va bot sizga mos HD Rasm va Stiker yaratib beradi!",
+        "🎨 **AI Rasm va Stiker yaratish:**\n\n"
+        "Shunchaki xohlagan narsangizni matn ko'rinishida yuboring (Masalan: *Balandlikda o'tirgan chiroyli mushuk*) va bot sizga mos **HD Rasm** va **Stiker** tayyorlab beradi!",
         parse_mode="Markdown"
     )
 
@@ -510,17 +605,18 @@ async def check_sub_handler(callback: types.CallbackQuery):
     await callback.message.delete()
     await callback.message.answer("🎉 **Rahmat! Obuna tasdiqlandi.** Botdan bemalol foydalanishingiz mumkin.", reply_markup=Keyboards.get_user_main())
 
+# ----------------- AI RASM VA STIKER YARATISH -----------------
+
 @dp.message(F.text & ~F.text.startswith("/"))
 async def generate_ai_handler(message: types.Message):
     user_prompt = message.text.strip()
     
-    # NSFW Tekshirish
     if AIService.is_nsfw(user_prompt):
         await message.answer("⚠️ **Kechirasiz! Botda nojo'ya va taqiqlangan mazmundagi rasmlarni yaratish cheklangan.**")
         return
 
     async with ChatActionSender.upload_photo(bot=data_bot, chat_id=message.chat.id):
-        status_msg = await message.answer("🎨 *AI rasmingizni chizmoqda... Biroz kutib turing.*", parse_mode="Markdown")
+        status_msg = await message.answer("🎨 *AI rasmingiz va stikeringizni chizmoqda... Biroz kutib turing.*", parse_mode="Markdown")
         
         en_prompt = await AIService.translate_to_english(user_prompt)
         img_bytes, engine_name = await AIService.generate_image(en_prompt)
@@ -529,17 +625,23 @@ async def generate_ai_handler(message: types.Message):
             await status_msg.edit_text("❌ Serverlar hozirda band. Iltimos, 1 minutdan so'ng qayta urinib ko'ring.")
             return
 
+        # Stiker yaratish
         sticker_bytes = AIService.create_sticker(img_bytes)
         img_bytes.seek(0)
         
         bot_info = await data_bot.get_me()
         
+        # 1. Rasmni yuborish
         await message.answer_photo(
             photo=BufferedInputFile(img_bytes.read(), filename="ai_image.png"),
             caption=f"🖼 **So'rovingiz:** `{user_prompt}`\n⚙️ **Engine:** `{engine_name}`\n\n✨ Botimiz: @{bot_info.username}",
             parse_mode="Markdown"
         )
-        await message.answer_sticker(sticker=BufferedInputFile(sticker_bytes.read(), filename="ai_sticker.webp"))
+        
+        # 2. Stikerni haqiqiy Telegram Stikeri shaklida yuborish
+        await message.answer_sticker(
+            sticker=BufferedInputFile(sticker_bytes.read(), filename="sticker.webp")
+        )
         
         await Database.increment_generation(message.from_user.id)
         await status_msg.delete()
@@ -555,7 +657,6 @@ async def main():
     
     await Database.init_db()
     
-    # Web server va Auto-ping vazifalarini fonda yurgizish
     asyncio.create_task(start_web_server())
     asyncio.create_task(self_ping_loop())
     
