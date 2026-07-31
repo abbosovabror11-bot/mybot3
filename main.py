@@ -34,8 +34,8 @@ from aiogram.utils.chat_action import ChatActionSender
 # 1. KONFIGURATSIYA VA O'ZGARUVCHILAR
 # ==============================================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-ADMINS_RAW = os.getenv("ADMINS", "123456789")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAGxdKm-7d6cjFet5hnk2OD5Lu5h6T_7Tvk")
+ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
 # Majburiy obuna kanallari ro'yxati
