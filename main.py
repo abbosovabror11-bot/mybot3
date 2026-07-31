@@ -45,10 +45,25 @@ RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 DATABASE_PATH = "bot_data.db"
 
 # Keshlar
-sub_cache = TTLCache(maxsize=20000, ttl=120)
-user_cooldown = TTLCache(maxsize=20000, ttl=5)
+sub_cache = TTLCache(maxsize=20000, ttl=300) # Obuna kesh vaqti uzaytirildi
+user_cooldown = TTLCache(maxsize=20000, ttl=4)
 
 NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
+
+# Menyu tugmalari matni (Obuna tekshiruvidan istisno qilish uchun)
+MENU_BUTTONS = [
+    "🎨 AI Rasm Yaratish 🚀",
+    "💡 Tasodifiy G'oya ✨",
+    "🏆 TOP-10 Liderlar ⭐️",
+    "📊 Mening Statistikam 📈",
+    "ℹ️ Bot Haqida 🤖",
+    "📢 Kanallarni Boshqarish ⚙️",
+    "📊 Umumiy Statistika 📈",
+    "📣 Reklama Tarqatish 🚀",
+    "💾 Bazani Yuklab Olish 📥",
+    "👤 Foydalanuvchi Rejimiga O'tish ⬅️",
+    "❌ Bekor Qilish"
+]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +74,7 @@ logger = logging.getLogger("ProductionAIBot")
 
 
 # ==============================================================================
-# 2. MA'LUMOTLAR BAZASI (SQLITE ASYNC)
+# 2. MA'LUMOTLAR BAZASI
 # ==============================================================================
 
 class Database:
@@ -179,7 +194,7 @@ class Database:
 
 
 # ==============================================================================
-# 3. YORQIN VA QULAY TUGMALAR (KEYBOARDS)
+# 3. KEYBOARDS
 # ==============================================================================
 
 class Keyboards:
@@ -214,7 +229,7 @@ class Keyboards:
 
 
 # ==============================================================================
-# 4. MIDDLEWARES
+# 4. MIDDLEWARES (TUTIB QOLUVCHI FILTERLAR)
 # ==============================================================================
 
 class MultiChannelSubMiddleware(types.TelegramObject):
@@ -227,9 +242,16 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         bot: Bot = data['bot']
         user: types.User = data.get('event_from_user')
 
+        # Adminlar yoki foydalanuvchi mavjud bo'lmasa o'tkazib yuborish
         if not user or user.id in ADMINS:
             return await handler(event, data)
 
+        # /start komandasi yoki menyu tugmalari bosilganda obunani qayta tekshirmaslik
+        if isinstance(event, Message):
+            if event.text in MENU_BUTTONS or event.text.startswith("/start"):
+                return await handler(event, data)
+
+        # Keshda obunasi bor bo'lsa o'tkazish
         if sub_cache.get(user.id) is True:
             return await handler(event, data)
 
@@ -241,11 +263,12 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         for ch_id, title, link in channels:
             try:
                 member = await bot.get_chat_member(chat_id=ch_id, user_id=user.id)
+                # left yoki kicked bo'lsa obunasiz deb hisoblash
                 if member.status in ["left", "kicked"]:
                     unsubscribed_channels.append((title, link))
             except Exception as e:
-                logger.warning(f"Kanal tekshirishda xatolik: {ch_id} - {e}")
-                unsubscribed_channels.append((title, link))
+                logger.warning(f"Kanal tekshirishda xatolik (Bot admin emasmi yoki ID xato?): {ch_id} - {e}")
+                # Agarda bot kanal admini bo'lmasa xatolik beradi, foydalanuvchini bloklab qo'ymaslik uchun o'tkazib yuboriladi
 
         if not unsubscribed_channels:
             sub_cache[user.id] = True
@@ -265,7 +288,6 @@ class MultiChannelSubMiddleware(types.TelegramObject):
         elif isinstance(event, CallbackQuery):
             if event.data == "check_sub":
                 sub_cache.pop(user.id, None)
-                await event.answer("🔄 Obuna tekshirilmoqda...", show_alert=False)
                 return await handler(event, data)
             await event.message.answer(text, reply_markup=kb, parse_mode="Markdown")
             await event.answer()
@@ -284,16 +306,17 @@ class AntiSpamMiddleware(types.TelegramObject):
             return await handler(event, data)
 
         if isinstance(event, Message) and event.text and not event.text.startswith("/"):
-            if user_cooldown.get(user.id):
-                await event.answer("⏳ **Iltimos, biroz kutib turing!** Ketma-ket so'rov yubormang.", parse_mode="Markdown")
-                return
-            user_cooldown[user.id] = True
+            if event.text not in MENU_BUTTONS:
+                if user_cooldown.get(user.id):
+                    await event.answer("⏳ **Iltimos, biroz kutib turing!** Ketma-ket so'rov yubormang.", parse_mode="Markdown")
+                    return
+                user_cooldown[user.id] = True
 
         return await handler(event, data)
 
 
 # ==============================================================================
-# 5. AI XIZMATLARI VA STIKER TAYYORLASH
+# 5. AI XIZMATLARI
 # ==============================================================================
 
 class AIService:
@@ -351,7 +374,6 @@ class AIService:
 
     @staticmethod
     def create_sticker(image_bytes: BytesIO) -> BytesIO:
-        """ Telegram stiker formati WEBP (512x512 max) ga o'tkazish """
         image_bytes.seek(0)
         img = Image.open(image_bytes).convert("RGBA")
         img.thumbnail((512, 512))
@@ -426,14 +448,14 @@ async def start_handler(message: types.Message, state: FSMContext):
     
     await message.answer(
         "✨ **Professional AI Botiga Xush Kelibsiz!**\n\n"
-        "Manga xohlagan so'zingizni yuboring (Masalan: *Futbol o'ynayotgan sher*), men unga mos **HD Rasm** hamda **Eksklyuziv Stiker** yaratib beraman!",
+        "Manga xohlagan so'zingizni yuboring (Masalan: *Dengiz bo'yidagi kelajak shahri*), men unga mos **HD Rasm** hamda **Stiker** yaratib beraman!",
         reply_markup=kb,
         parse_mode="Markdown"
     )
 
 @dp.message(Command("admin"), F.from_user.id.in_(ADMINS))
 async def admin_panel(message: types.Message):
-    await message.answer("👑 **Admin Panelga Xush Kelibsiz!**\nQuyidagi tugmalar orqali botni to'liq boshqara olasiz:", reply_markup=Keyboards.get_admin_main())
+    await message.answer("👑 **Admin Panelga Xush Kelibsiz!**\nQuyidagi tugmalar orqali botni boshqarasiz:", reply_markup=Keyboards.get_admin_main())
 
 @dp.message(F.text == "👤 Foydalanuvchi Rejimiga O'tish ⬅️")
 async def back_to_user_mode(message: types.Message):
@@ -523,7 +545,7 @@ async def admin_stats(message: types.Message):
 @dp.message(F.text == "📣 Reklama Tarqatish 🚀", F.from_user.id.in_(ADMINS))
 async def start_broadcast(message: types.Message, state: FSMContext):
     await state.set_state(AdminState.waiting_for_broadcast)
-    await message.answer("📢 **Reklama postini yuboring (Rasm, Video, Matn bo'lishi mumkin):**", reply_markup=Keyboards.get_cancel())
+    await message.answer("📢 **Reklama postini yuboring:**", reply_markup=Keyboards.get_cancel())
 
 @dp.message(F.text == "❌ Bekor Qilish", StateFilter(AdminState.waiting_for_broadcast))
 async def cancel_broadcast(message: types.Message, state: FSMContext):
@@ -595,15 +617,30 @@ async def random_idea(message: types.Message):
 @dp.message(F.text == "ℹ️ Bot Haqida 🤖")
 async def info_handler(message: types.Message):
     await message.answer(
-        "🎨 **AI Rasm va Stiker yaratish:**\n\n"
-        "Shunchaki xohlagan narsangizni matn ko'rinishida yuboring (Masalan: *Balandlikda o'tirgan chiroyli mushuk*) va bot sizga mos **HD Rasm** va **Stiker** tayyorlab beradi!",
+        "🎨 **Rasm va Stiker yaratish yo'riqnomasi:**\n\n"
+        "Shunchaki xohlagan tasviringizni matn ko'rinishida yuboring (Masalan: *Balandlikda o'tirgan chiroyli mushuk*) va bot sizga mos **HD Rasm** va **Stiker** yaratib beradi!",
         parse_mode="Markdown"
     )
 
 @dp.callback_query(F.data == "check_sub")
-async def check_sub_handler(callback: types.CallbackQuery):
-    await callback.message.delete()
-    await callback.message.answer("🎉 **Rahmat! Obuna tasdiqlandi.** Botdan bemalol foydalanishingiz mumkin.", reply_markup=Keyboards.get_user_main())
+async def check_sub_handler(callback: types.CallbackQuery, bot: Bot):
+    channels = await Database.get_channels()
+    unsubscribed_channels = []
+    
+    for ch_id, title, link in channels:
+        try:
+            member = await bot.get_chat_member(chat_id=ch_id, user_id=callback.from_user.id)
+            if member.status in ["left", "kicked"]:
+                unsubscribed_channels.append((title, link))
+        except Exception:
+            pass
+
+    if not unsubscribed_channels:
+        sub_cache[callback.from_user.id] = True
+        await callback.message.delete()
+        await callback.message.answer("🎉 **Obunangiz tasdiqlandi!** Endi istalgan matningizni yuborib HD rasm olishingiz mumkin.", reply_markup=Keyboards.get_user_main())
+    else:
+        await callback.answer("❌ Siz hali barcha kanallarga obuna bo'lmadingiz!", show_alert=True)
 
 # ----------------- AI RASM VA STIKER YARATISH -----------------
 
@@ -611,6 +648,10 @@ async def check_sub_handler(callback: types.CallbackQuery):
 async def generate_ai_handler(message: types.Message):
     user_prompt = message.text.strip()
     
+    # Menyu tugmasi bo'lsa AI ishlamaydi
+    if user_prompt in MENU_BUTTONS:
+        return
+
     if AIService.is_nsfw(user_prompt):
         await message.answer("⚠️ **Kechirasiz! Botda nojo'ya va taqiqlangan mazmundagi rasmlarni yaratish cheklangan.**")
         return
@@ -625,7 +666,6 @@ async def generate_ai_handler(message: types.Message):
             await status_msg.edit_text("❌ Serverlar hozirda band. Iltimos, 1 minutdan so'ng qayta urinib ko'ring.")
             return
 
-        # Stiker yaratish
         sticker_bytes = AIService.create_sticker(img_bytes)
         img_bytes.seek(0)
         
@@ -638,7 +678,7 @@ async def generate_ai_handler(message: types.Message):
             parse_mode="Markdown"
         )
         
-        # 2. Stikerni haqiqiy Telegram Stikeri shaklida yuborish
+        # 2. Stikerni yuborish
         await message.answer_sticker(
             sticker=BufferedInputFile(sticker_bytes.read(), filename="sticker.webp")
         )
