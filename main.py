@@ -481,7 +481,6 @@ async def process_payment_screenshot(message: types.Message, state: FSMContext):
     user = message.from_user
     photo = message.photo[-1].file_id
     
-    # Adminlarga yuborish uchun klaviatura
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="✅ Tasdiqlash (50)", callback_data=f"approve_{user.id}_50"),
@@ -504,7 +503,7 @@ async def process_payment_screenshot(message: types.Message, state: FSMContext):
         except Exception as e:
             logger.error(f"Adminga chekni yuborishda xato: {e}")
             
-    await message.answer("✅ To'lov chekingiz adinlarga yuborildi! Tekshirilgach hisobingizga qo'shiladi.", reply_markup=Keyboards.get_user_main())
+    await message.answer("✅ To'lov chekingiz adminlarga yuborildi! Tekshirilgach hisobingizga qo'shiladi.", reply_markup=Keyboards.get_user_main())
 
 @dp.message(StateFilter(PaymentState.waiting_for_screenshot))
 async def wrong_payment_format(message: types.Message, state: FSMContext):
@@ -522,7 +521,7 @@ async def approve_payment(callback: types.CallbackQuery):
     
     await Database.add_balance(target_user_id, stars_amount)
     try:
-        await callback.bot.send_message(target_user_id, f"🎉 Tabriklaymiz! To'lovingiz tasdiqlandi va balansigizga `{stars_amount} Stars` qo'shildi! ⭐️", parse_mode="Markdown")
+        await callback.bot.send_message(target_user_id, f"🎉 Tabriklaymiz! To'lovingiz tasdiqlandi va balansingizga `{stars_amount} Stars` qo'shildi! ⭐️", parse_mode="Markdown")
     except:
         pass
     
@@ -539,13 +538,12 @@ async def reject_payment(callback: types.CallbackQuery):
     await callback.message.edit_caption(caption=callback.message.caption + f"\n\n❌ **RAD ETILDI**", parse_mode="Markdown")
     await callback.answer("To'lov rad etildi.")
 
-# Stars xarid qilish (Telegram Stars orqali)
 @dp.callback_query(F.data.in_(["buy_stars_50_tg", "buy_stars_100_tg"]))
 async def buy_stars_tg(callback: types.CallbackQuery):
     prices = await Database.get_prices()
     if "50" in callback.data:
         amount_stars = 50
-        price_sum = int(prices.get("star_price_50", "10000")) // 1000 # Taxminiy Telegram Star qiymati
+        price_sum = int(prices.get("star_price_50", "10000")) // 1000
     else:
         amount_stars = 100
         price_sum = int(prices.get("star_price_100", "20000")) // 1000
