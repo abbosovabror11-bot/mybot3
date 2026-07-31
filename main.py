@@ -42,8 +42,8 @@ ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip(
 
 PORT = int(os.getenv("PORT", 8080))
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
-# Mini App saytingiz havolasini shu yerga yozasiz (masalan: https://username.github.io/app/)
-WEB_APP_URL = os.getenv("WEB_APP_URL", "https://your-mini-app-url.com") 
+# Mini App saytingiz havolasi Netlify'dan olganingizga o'zgartirildi:
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://eclectic-starlight-cfbad8.netlify.app") 
 DATABASE_PATH = "bot_data.db"
 
 NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
@@ -482,7 +482,7 @@ async def delete_channel_handler(callback: types.CallbackQuery):
 async def change_price_start(message: types.Message, state: FSMContext):
     current = await Database.get_star_price()
     await state.set_state(AdminState.waiting_for_new_price)
-    await message.answer(f"💰 Joriy narx: `{current}` Stars\nYangi narelni yuboring:", reply_markup=Keyboards.get_cancel(), parse_mode="Markdown")
+    await message.answer(f"💰 Joriy narx: `{current}` Stars\Yangi narelni yuboring:", reply_markup=Keyboards.get_cancel(), parse_mode="Markdown")
 
 @dp.message(StateFilter(AdminState.waiting_for_new_price), F.from_user.id.in_(ADMINS))
 async def process_new_price(message: types.Message, state: FSMContext):
