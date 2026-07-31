@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SKINOZ - Professional Mini App</title>
+    <title>PICTURE UZ BOT - Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -50,9 +50,9 @@
         }
 
         .logo-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 900;
-            letter-spacing: 1.5px;
+            letter-spacing: 1px;
             color: var(--accent);
             text-shadow: 0 0 12px var(--accent-glow);
         }
@@ -118,7 +118,6 @@
             padding: 14px;
             border: 1px solid var(--border);
             text-align: center;
-            transition: transform 0.2s;
         }
 
         .item-card img {
@@ -241,7 +240,7 @@
             text-align: center;
         }
 
-        .modal-content input, .modal-content select {
+        .modal-content input {
             width: 100%;
             padding: 12px;
             background: var(--bg-color);
@@ -299,22 +298,22 @@
     <!-- 1. BOSH SAHIFA -->
     <div id="view-home" class="view active">
         <div class="header">
-            <div class="logo-title">SKINOZ</div>
+            <div class="logo-title">PICTURE UZ BOT</div>
             <div class="status-badge">🟢 Faol</div>
         </div>
 
         <div class="balance-box">
             <div class="section-title" style="justify-content: center;">Mening Balansim</div>
             <div class="balances">
-                <span id="user-balance">50,000 so'm</span>
+                <span id="user-balance">0 so'm</span>
             </div>
-            <button class="btn" style="margin-top: 15px;" onclick="openModal('auto-pay-modal')">💳 Avto-to'ldirish (Payme / Click)</button>
+            <button class="btn" style="margin-top: 15px;" onclick="openModal('auto-pay-modal')">💳 Balansni To'ldirish</button>
         </div>
 
         <div class="section-title">AI Rasm Generatori</div>
         <div style="background: var(--card-bg); padding: 16px; border-radius: 14px; border: 1px solid var(--border); text-align: center;">
-            <input type="text" id="ai-prompt" placeholder="Masalan: Futuristic cyberpunk city..." style="width:100%; padding:12px; background:var(--bg-color); border:1px solid var(--border); border-radius:10px; color:#fff; margin-bottom:12px; font-size:14px;">
-            <button class="btn" onclick="generateImage()">✨ Rasm yaratish (5,000 so'm)</button>
+            <input type="text" id="ai-prompt" placeholder="Rasmni tavsiflang..." style="width:100%; padding:12px; background:var(--bg-color); border:1px solid var(--border); border-radius:10px; color:#fff; margin-bottom:12px; font-size:14px;">
+            <button class="btn" onclick="generateImage()">✨ Rasm yaratish (2,000 so'm)</button>
         </div>
     </div>
 
@@ -385,18 +384,17 @@
     </div>
 </div>
 
-<!-- Avto-to'lov Modali -->
+<!-- Balansni To'ldirish Modali (Chek/Skrinshot yuborish bilan) -->
 <div class="modal" id="auto-pay-modal">
     <div class="modal-content">
         <h3>Balansni To'ldirish</h3>
-        <p style="font-size: 13px; color: var(--text-muted); margin: 10px 0;">To'lov miqdorini tanlang:</p>
-        <select id="auto-pay-amount">
-            <option value="10000">10,000 so'm</option>
-            <option value="25000">25,000 so'm</option>
-            <option value="50000">50,000 so'm</option>
-            <option value="100000">100,000 so'm</option>
-        </select>
-        <button class="btn" onclick="startAutoPayment()">Payme / Click orqali to'lash</button>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 8px 0;">
+            Karta: <code>8600 0000 0000 0000</code><br>
+            Pul o'tkazib, chek skrinshotini yuboring va summani kiriting (Min: 1,000, Max: 1,000,000):
+        </p>
+        <input type="number" id="custom-pay-amount" placeholder="Summani kiriting (so'm)" min="1000" max="1000000">
+        <input type="file" id="payment-screenshot" accept="image/*" style="font-size: 12px; padding: 6px; background: var(--bg-color); border: 1px solid var(--border); border-radius: 10px; width: 100%; margin-bottom: 10px; color: var(--text-muted);">
+        <button class="btn" onclick="submitPaymentRequest()">To'lovni Tasdiqlatish uchun yuborish</button>
         <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('auto-pay-modal')">Yopish</button>
     </div>
 </div>
@@ -432,21 +430,15 @@
     const ADMIN_ID = "8694110588";
     let user = tg.initDataUnsafe?.user;
 
-    let userData = JSON.parse(localStorage.getItem('skinoz_pro_user')) || { balance: 50000 };
-    let userGallery = JSON.parse(localStorage.getItem('skinoz_pro_gallery')) || [
-        { url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300" }
+    let userData = JSON.parse(localStorage.getItem('picture_uz_user')) || { balance: 0 };
+    let userGallery = JSON.parse(localStorage.getItem('picture_uz_gallery')) || [];
+    let transactionHistory = JSON.parse(localStorage.getItem('picture_uz_history')) || [];
+    let shopItems = JSON.parse(localStorage.getItem('picture_uz_shop')) || [
+        { id: 1, title: 'Boshlang\'ich Paket', price: 10000, priceText: '10,000 so\'m' },
+        { id: 2, title: 'O\'rta Paket', price: 25000, priceText: '25,000 so\'m' },
+        { id: 3, title: 'Katta Paket', price: 50000, priceText: '50,000 so\'m' }
     ];
-    let transactionHistory = JSON.parse(localStorage.getItem('skinoz_pro_history')) || [
-        { text: "Boshlang'ich bonus", amount: "+50,000 so'm", time: "Hozirgina" }
-    ];
-    let shopItems = JSON.parse(localStorage.getItem('skinoz_pro_shop')) || [
-        { id: 1, title: 'VIP Paket 1', price: 10000, priceText: '10,000 so\'m' },
-        { id: 2, title: 'VIP Paket 2', price: 25000, priceText: '25,000 so\'m' },
-        { id: 3, title: 'VIP Paket 3', price: 50000, priceText: '50,000 so\'m' }
-    ];
-    let auctionItems = JSON.parse(localStorage.getItem('skinoz_pro_auction')) || [
-        { id: 1, title: 'Eksklyuziv Skin', price: 25000, img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300' }
-    ];
+    let auctionItems = JSON.parse(localStorage.getItem('picture_uz_auction')) || [];
 
     function updateUI() {
         document.getElementById('user-balance').innerText = userData.balance.toLocaleString() + " so'm";
@@ -456,11 +448,11 @@
             if (user.photo_url) document.getElementById('user-avatar').src = user.photo_url;
         }
         
-        localStorage.setItem('skinoz_pro_user', JSON.stringify(userData));
-        localStorage.setItem('skinoz_pro_shop', JSON.stringify(shopItems));
-        localStorage.setItem('skinoz_pro_gallery', JSON.stringify(userGallery));
-        localStorage.setItem('skinoz_pro_history', JSON.stringify(transactionHistory));
-        localStorage.setItem('skinoz_pro_auction', JSON.stringify(auctionItems));
+        localStorage.setItem('picture_uz_user', JSON.stringify(userData));
+        localStorage.setItem('picture_uz_shop', JSON.stringify(shopItems));
+        localStorage.setItem('picture_uz_gallery', JSON.stringify(userGallery));
+        localStorage.setItem('picture_uz_history', JSON.stringify(transactionHistory));
+        localStorage.setItem('picture_uz_auction', JSON.stringify(auctionItems));
         
         renderShop();
         renderAuction();
@@ -484,14 +476,30 @@
         if (transactionHistory.length > 20) transactionHistory.pop();
     }
 
-    function startAutoPayment() {
-        let amount = Number(document.getElementById('auto-pay-amount').value);
+    function submitPaymentRequest() {
+        let amount = Number(document.getElementById('custom-pay-amount').value);
+        let screenshot = document.getElementById('payment-screenshot').files[0];
+
+        if (!amount || amount < 1000 || amount > 1000000) {
+            alert("Iltimos, 1,000 so'mdan 1,000,000 so'mgacha bo'lgan to'g'ri miqdorni kiriting!");
+            return;
+        }
+        if (!screenshot) {
+            alert("Iltimos, to'lov cheki skrinshotini yuklang!");
+            return;
+        }
+
         closeModal('auto-pay-modal');
         
-        userData.balance += amount;
-        addHistory("Balans to'ldirildi", "+" + amount.toLocaleString() + " so'm");
+        // Telegram bot orqali adminga yuborish simulatsiyasi yoki avtomatik qabul qilish
+        // Real botda bu yerda fetch orqali adminda skrinshot va summa ko'rsatiladi.
+        userData.balance += amount; // Vaqtincha avtomatik qo'shiladi, xohlasangiz buni olib tashlab faqat adminga yuborishingiz mumkin.
+        addHistory("Balans to'ldirildi (Chek)", "+" + amount.toLocaleString() + " so'm");
         updateUI();
-        alert(`✅ To'lov muvaffaqiyatli amalga oshirildi! Balansingizga ${amount.toLocaleString()} so'm qo'shildi.`);
+
+        alert(`✅ To'lov talabingiz yuborildi! Skrinshot qabul qilindi va balansingizga ${amount.toLocaleString()} so'm qo'shildi.`);
+        document.getElementById('custom-pay-amount').value = '';
+        document.getElementById('payment-screenshot').value = '';
     }
 
     function renderShop() {
@@ -520,6 +528,10 @@
     function renderAuction() {
         let grid = document.getElementById('auction-grid');
         grid.innerHTML = '';
+        if(auctionItems.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted); font-size:13px; grid-column: span 2; text-align:center;">Auksionda mahsulotlar yo\'q</p>';
+            return;
+        }
         auctionItems.forEach((item, index) => {
             grid.innerHTML += `
                 <div class="item-card">
@@ -585,9 +597,9 @@
     function generateImage() {
         let prompt = document.getElementById('ai-prompt').value;
         if (!prompt) { alert("Tavsif yozing!"); return; }
-        if (userData.balance < 5000) { alert("Balansingizda mablag' yetarli emas! (Narxi: 5,000 so'm)"); return; }
-        userData.balance -= 5000;
-        addHistory("AI Rasm yaratish", "-5,000 so'm");
+        if (userData.balance < 2000) { alert("Balansingizda mablag' yetarli emas! (Narxi: 2,000 so'm)"); return; }
+        userData.balance -= 2000;
+        addHistory("AI Rasm yaratish", "-2,000 so'm");
         
         let sampleImages = [
             "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=300",
@@ -602,6 +614,10 @@
     function renderGallery() {
         let galleryEl = document.getElementById('user-gallery');
         galleryEl.innerHTML = '';
+        if(userGallery.length === 0) {
+            galleryEl.innerHTML = '<p style="color:var(--text-muted); font-size:13px; grid-column: span 3; text-align:center;">Rasmlar yo\'q</p>';
+            return;
+        }
         userGallery.forEach(img => {
             galleryEl.innerHTML += `<div class="gallery-item"><img src="${img.url}"></div>`;
         });
@@ -610,6 +626,10 @@
     function renderHistory() {
         let historyEl = document.getElementById('transaction-history');
         historyEl.innerHTML = '';
+        if(transactionHistory.length === 0) {
+            historyEl.innerHTML = '<p style="color:var(--text-muted); font-size:12px; text-align:center;">Tarix bo\'sh</p>';
+            return;
+        }
         transactionHistory.forEach(h => {
             historyEl.innerHTML += `
                 <div class="history-item">
