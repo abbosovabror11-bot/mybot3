@@ -306,11 +306,9 @@
             <div class="section-title">Mening Hisobim</div>
             <div class="balances">
                 <div class="balance-item">Olmos: <span id="user-diamonds">50 💎</span></div>
-                <div class="balance-item">Stars: <span id="user-stars">3 ⭐</span></div>
             </div>
-            <div class="topup-buttons" style="display: flex; gap: 10px;">
-                <button class="btn" onclick="openStarsPayModal()">⭐ Stars To'ldirish</button>
-                <button class="btn btn-outline" onclick="openModal('topup-uzs-modal')">💳 So'mda To'ldirish</button>
+            <div class="topup-buttons">
+                <button class="btn" onclick="openModal('topup-uzs-modal')">💳 So'mda To'ldirish</button>
             </div>
         </div>
 
@@ -321,18 +319,26 @@
         </div>
     </div>
 
-    <!-- 2. SHOP SAHIFASI (Stars sotish) -->
+    <!-- 2. SHOP SAHIFASI -->
     <div id="view-shop" class="view">
         <div class="header">
             <div class="logo-title">SHOP ⭐</div>
         </div>
-        <div class="section-title">Stars sotib olish</div>
-        <div class="grid" id="shop-grid">
-            <!-- Dinamik to'ldiriladi -->
-        </div>
+        <div class="section-title">Mahsulotlar</div>
+        <div class="grid" id="shop-grid"></div>
     </div>
 
-    <!-- 3. PROFIL (Yaratilgan rasmlar galereyasi bilan) -->
+    <!-- 3. AUKSION INVENTARI -->
+    <div id="view-auction" class="view">
+        <div class="header">
+            <div class="logo-title">AUKSION 🔨</div>
+        </div>
+        <div class="section-title">Auksiondagi mahsulotlar</div>
+        <button class="btn" style="margin-bottom: 15px;" onclick="openModal('add-auction-modal')">+ Mahsulotni auksionga qo'yish</button>
+        <div class="grid" id="auction-grid"></div>
+    </div>
+
+    <!-- 4. PROFIL -->
     <div id="view-profile" class="view">
         <div class="profile-card">
             <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" class="avatar" id="user-avatar" alt="Avatar">
@@ -341,12 +347,10 @@
         </div>
 
         <div class="section-title">Mening yaratgan rasmlarim 🎨</div>
-        <div class="gallery-grid" id="user-gallery">
-            <!-- Yaratilgan rasmlar avtomatik shu yerga qo'shiladi -->
-        </div>
+        <div class="gallery-grid" id="user-gallery"></div>
     </div>
 
-    <!-- 4. ADMIN PANEL SAHIFASI -->
+    <!-- 5. ADMIN PANEL SAHIFASI -->
     <div id="view-admin" class="view">
         <div class="header">
             <div class="logo-title">ADMIN PANEL</div>
@@ -354,15 +358,25 @@
         <div class="admin-panel-badge">Boshqaruv markazi</div>
         
         <div style="background: var(--card-bg); padding: 15px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 15px;">
-            <div class="section-title" style="margin-bottom: 8px;">Shop Narxlarini Tahrirlash (Stars)</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Quyidagi tovarlar narxi va miqdorini o'zgartirishingiz mumkin:</p>
+            <div class="section-title" style="margin-bottom: 8px;">Shop Narxlarini Tahrirlash</div>
             <div id="admin-shop-editor"></div>
         </div>
     </div>
 
 </div>
 
-<!-- So'm orqali to'ldirish Modali -->
+<!-- Auksionga mahsulot qo'shish Modali -->
+<div class="modal" id="add-auction-modal">
+    <div class="modal-content">
+        <h3>Auksionga qo'shish</h3>
+        <input type="text" id="auction-item-title" placeholder="Mahsulot nomi">
+        <input type="number" id="auction-item-price" placeholder="Boshlang'ich narxi (Olmos 💎)">
+        <button class="btn" onclick="addAuctionItem()">Auksionga chiqarish</button>
+        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('add-auction-modal')">Yopish</button>
+    </div>
+</div>
+
+<!-- So'm orqali to'ldirish Modali (Adminga skrinshot yuborish) -->
 <div class="modal" id="topup-uzs-modal">
     <div class="modal-content">
         <h3>So'mda to'ldirish</h3>
@@ -385,24 +399,6 @@
     </div>
 </div>
 
-<!-- Telegram Stars To'lov Oynasi -->
-<div class="modal" id="telegram-stars-modal">
-    <div class="modal-content">
-        <h3 style="color:var(--accent);">⭐ Stars Top up</h3>
-        <p style="font-size: 13px; color: var(--text-muted); margin: 10px 0;">
-            SKINOZda Stars hisobingizni to'ldirish uchun miqdorni tanlang:
-        </p>
-        <select id="stars-topup-count">
-            <option value="5">5 Stars ⭐ (Telegram orqali)</option>
-            <option value="15">15 Stars ⭐ (Telegram orqali)</option>
-            <option value="50">50 Stars ⭐ (Telegram orqali)</option>
-            <option value="100">100 Stars ⭐ (Telegram orqali)</option>
-        </select>
-        <button class="btn" onclick="payWithTelegramStars()">5 yulduz evaziga to'lash</button>
-        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('telegram-stars-modal')">Yopish</button>
-    </div>
-</div>
-
 <!-- Navigation Bar -->
 <nav class="nav-bar">
     <button class="nav-item active" onclick="switchView('home', this)">
@@ -412,6 +408,10 @@
     <button class="nav-item" onclick="switchView('shop', this)">
         <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.60 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
         Shop
+    </button>
+    <button class="nav-item" onclick="switchView('auction', this)">
+        <svg viewBox="0 0 24 24"><path d="M21 10h-8.35L17.8 4.5l-1.4-1.4L11 8.35V2h-2v6.35L4.6 3.1 3.2 4.5 8.65 10H0v2h24v-2zM2 20h20v-6H2v6z"/></svg>
+        Auksion
     </button>
     <button class="nav-item" onclick="switchView('profile', this)">
         <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
@@ -430,24 +430,23 @@
     const ADMIN_ID = "8694110588";
     let user = tg.initDataUnsafe?.user;
 
-    let userData = JSON.parse(localStorage.getItem('skinoz_user')) || { diamonds: 50, stars: 3 };
-    
-    // Foydalanuvchining yaratgan rasmlari ro'yxati (LocalStorage da saqlanadi)
+    let userData = JSON.parse(localStorage.getItem('skinoz_user')) || { diamonds: 50 };
     let userGallery = JSON.parse(localStorage.getItem('skinoz_gallery')) || [
         { url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300" }
     ];
-
     let shopItems = JSON.parse(localStorage.getItem('skinoz_shop')) || [
-        { id: 1, title: '10 Stars', stars: 10, priceText: '10 ⭐' },
-        { id: 2, title: '50 Stars', stars: 50, priceText: '50 ⭐' },
-        { id: 3, title: '100 Stars', stars: 100, priceText: '100 ⭐' }
+        { id: 1, title: 'Paket 1', priceText: '10 000 so\'m' },
+        { id: 2, title: 'Paket 2', priceText: '25 000 so\'m' },
+        { id: 3, title: 'Paket 3', priceText: '50 000 so\'m' }
+    ];
+    let auctionItems = JSON.parse(localStorage.getItem('skinoz_auction')) || [
+        { id: 1, title: 'Noyob Skin #1', price: 25, img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300' }
     ];
 
     let uploadedFile = null;
 
     function updateUI() {
         document.getElementById('user-diamonds').innerText = userData.diamonds + " 💎";
-        document.getElementById('user-stars').innerText = userData.stars + " ⭐";
         if (user) {
             document.getElementById('profile-name').innerText = user.first_name || "Foydalanuvchi";
             document.getElementById('profile-id').innerText = "ID: " + (user.id || ADMIN_ID);
@@ -456,8 +455,10 @@
         localStorage.setItem('skinoz_user', JSON.stringify(userData));
         localStorage.setItem('skinoz_shop', JSON.stringify(shopItems));
         localStorage.setItem('skinoz_gallery', JSON.stringify(userGallery));
+        localStorage.setItem('skinoz_auction', JSON.stringify(auctionItems));
         
         renderShop();
+        renderAuction();
         renderAdminEditor();
         renderGallery();
     }
@@ -465,14 +466,12 @@
     function switchView(viewName, element) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        
         document.getElementById('view-' + viewName).classList.add('active');
         element.classList.add('active');
     }
 
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function openStarsPayModal() { openModal('telegram-stars-modal'); }
 
     function handleFileSelect(e) {
         let file = e.target.files[0];
@@ -484,27 +483,12 @@
     }
 
     function sendReceiptToAdmin() {
-        if (!uploadedFile) {
-            alert("Iltimos, kamera tugmasini bosib skrinshotni tanlang!");
-            return;
-        }
-        alert(`✅ Skrinshot va to'lov so'rovi adminga (${ADMIN_ID}) muvaffaqiyatli yuborildi!`);
+        if (!uploadedFile) { alert("Iltimos, skrinshotni tanlang!"); return; }
+        alert(`✅ To'lov cheki skrinshoti adminga (${ADMIN_ID}) muvaffaqiyatli yuborildi!`);
         closeModal('topup-uzs-modal');
         uploadedFile = null;
         document.getElementById('file-name-text').innerText = "Skrinshot tanlanmagan";
         document.getElementById('file-name-text').style.color = "var(--text-muted)";
-    }
-
-    function payWithTelegramStars() {
-        let count = Number(document.getElementById('stars-topup-count').value);
-        if (tg.openInvoice) {
-            alert(`Siz ${count} ta Stars sotib olish uchun to'lov oynasiga yo'naltirilyapsiz.`);
-        } else {
-            userData.stars += count;
-            updateUI();
-            alert(`✨ Muvaffaqiyatli! Balansingizga ${count} ta Stars qo'shildi.`);
-            closeModal('telegram-stars-modal');
-        }
     }
 
     function renderShop() {
@@ -515,20 +499,52 @@
                 <div class="item-card">
                     <div class="item-title">${item.title}</div>
                     <div class="item-price">${item.priceText}</div>
-                    <button class="btn" onclick="buyShopItem(${item.stars})">Sotib olish</button>
+                    <button class="btn" onclick="openModal('topup-uzs-modal')">Sotib olish</button>
                 </div>
             `;
         });
     }
 
-    function buyShopItem(starsCount) {
-        if (userData.stars < starsCount) {
-            alert("Stars balansingiz yetarli emas!");
-            return;
-        }
-        userData.stars -= starsCount;
+    function renderAuction() {
+        let grid = document.getElementById('auction-grid');
+        grid.innerHTML = '';
+        auctionItems.forEach((item, index) => {
+            grid.innerHTML += `
+                <div class="item-card">
+                    <img src="${item.img}" alt="Auction Item">
+                    <div class="item-title">${item.title}</div>
+                    <div class="item-price">${item.price} 💎</div>
+                    <button class="btn" onclick="buyAuctionItem(${index})">Xarid qilish</button>
+                </div>
+            `;
+        });
+    }
+
+    function addAuctionItem() {
+        let title = document.getElementById('auction-item-title').value;
+        let price = Number(document.getElementById('auction-item-price').value);
+        if (!title || !price) { alert("Barcha maydonlarni to'ldiring!"); return; }
+
+        auctionItems.push({
+            id: Date.now(),
+            title: title,
+            price: price,
+            img: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=300"
+        });
         updateUI();
-        alert(`🎉 Muvaffaqiyatli xarid qilindi!`);
+        closeModal('add-auction-modal');
+        document.getElementById('auction-item-title').value = '';
+        document.getElementById('auction-item-price').value = '';
+        alert("✅ Mahsulot auksionga qo'shildi!");
+    }
+
+    function buyAuctionItem(index) {
+        let item = auctionItems[index];
+        if (userData.diamonds < item.price) { alert("Olmos yetarli emas!"); return; }
+        userData.diamonds -= item.price;
+        auctionItems.splice(index, 1);
+        updateUI();
+        alert("🎉 Auksiondan mahsulotni sotib oldingiz!");
     }
 
     function renderAdminEditor() {
@@ -538,7 +554,7 @@
             container.innerHTML += `
                 <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
                     <input type="text" id="admin-title-${index}" value="${item.title}" style="margin:0; padding:6px; font-size:12px;">
-                    <input type="number" id="admin-stars-${index}" value="${item.stars}" style="margin:0; padding:6px; width:70px; font-size:12px;" placeholder="Stars">
+                    <input type="text" id="admin-price-${index}" value="${item.priceText}" style="margin:0; padding:6px; width:110px; font-size:12px;">
                     <button class="btn" style="width:auto; padding:6px 12px; margin:0;" onclick="saveShopItem(${index})">Saqlash</button>
                 </div>
             `;
@@ -546,38 +562,25 @@
     }
 
     function saveShopItem(index) {
-        let newTitle = document.getElementById(`admin-title-${index}`).value;
-        let newStars = Number(document.getElementById(`admin-stars-${index}`).value);
-        
-        shopItems[index].title = newTitle;
-        shopItems[index].stars = newStars;
-        shopItems[index].priceText = newStars + " ⭐";
-        
+        shopItems[index].title = document.getElementById(`admin-title-${index}`).value;
+        shopItems[index].priceText = document.getElementById(`admin-price-${index}`).value;
         updateUI();
-        alert("✅ Shop muvaffaqiyatli yangilandi!");
+        alert("✅ Shop narxi yangilandi!");
     }
 
-    // AI rasm yaratish va uni avtomatik galereyaga (Profilga) qo'shish
     function generateImage() {
         let prompt = document.getElementById('ai-prompt').value;
         if (!prompt) { alert("Tavsif yozing!"); return; }
         if (userData.diamonds < 5) { alert("Olmos yetarli emas!"); return; }
-        
         userData.diamonds -= 5;
-
-        // Tasodifiy yangi AI rasm namunasi (yoki botdan kelgan rasm URL manzili)
+        
         let sampleImages = [
             "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=300",
-            "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=300",
-            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300"
+            "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=300"
         ];
-        let randomImg = sampleImages[Math.floor(Math.random() * sampleImages.length)];
-
-        // Avtomatik ravishda profil galereyasiga qo'shish
-        userGallery.unshift({ url: randomImg });
-
+        userGallery.unshift({ url: sampleImages[Math.floor(Math.random() * sampleImages.length)] });
         updateUI();
-        alert("✨ Rasm yaratildi va Profilingizdagi galereyaga avtomatik qo'shildi!");
+        alert("✨ Rasm yaratildi va Profilingizdagi galereyaga qo'shildi!");
         document.getElementById('ai-prompt').value = '';
     }
 
@@ -585,11 +588,7 @@
         let galleryEl = document.getElementById('user-gallery');
         galleryEl.innerHTML = '';
         userGallery.forEach(img => {
-            galleryEl.innerHTML += `
-                <div class="gallery-item">
-                    <img src="${img.url}" alt="AI Image">
-                </div>
-            `;
+            galleryEl.innerHTML += `<div class="gallery-item"><img src="${img.url}"></div>`;
         });
     }
 
