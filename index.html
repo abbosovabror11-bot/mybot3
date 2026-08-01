@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PICTURE UZ BOT - Mini App</title>
+    <title>PICTURE UZ - Pro Store</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             --bg-color: #0b0f19;
             --card-bg: #131b2e;
-            --accent: #00ff88;
-            --accent-glow: rgba(0, 255, 136, 0.25);
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.25);
             --text-main: #ffffff;
             --text-muted: #94a3b8;
             --danger: #ef4444;
@@ -22,7 +22,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -44,160 +44,161 @@
             align-items: center;
             margin-bottom: 20px;
             background: var(--card-bg);
-            padding: 12px 16px;
-            border-radius: 14px;
+            padding: 14px 18px;
+            border-radius: 16px;
             border: 1px solid var(--border);
         }
 
         .logo-title {
             font-size: 18px;
-            font-weight: 900;
-            letter-spacing: 1px;
+            font-weight: 800;
             color: var(--accent);
-            text-shadow: 0 0 12px var(--accent-glow);
         }
 
         .status-badge {
             font-size: 11px;
-            background: rgba(0, 255, 136, 0.1);
+            background: rgba(59, 130, 246, 0.1);
             color: var(--accent);
-            padding: 4px 8px;
-            border-radius: 6px;
-            border: 1px solid rgba(0, 255, 136, 0.3);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            font-weight: 600;
         }
 
         .view { display: none; }
-        .view.active { display: block; animation: fadeIn 0.3s ease; }
+        .view.active { display: block; animation: fadeIn 0.25s ease-in-out; }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
+            from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .profile-card {
             background: var(--card-bg);
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 20px;
+            padding: 24px 16px;
             text-align: center;
             margin-bottom: 20px;
             border: 1px solid var(--border);
         }
 
         .avatar {
-            width: 76px;
-            height: 76px;
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
             border: 2px solid var(--accent);
             margin: 0 auto 12px;
             object-fit: cover;
-            box-shadow: 0 0 15px var(--accent-glow);
+            box-shadow: 0 0 20px var(--accent-glow);
         }
 
-        .username { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+        .username { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
         .user-id { color: var(--text-muted); font-size: 13px; }
 
         .section-title {
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 700;
             margin-bottom: 12px;
             color: var(--text-muted);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
+            gap: 14px;
         }
 
         .item-card {
             background: var(--card-bg);
-            border-radius: 14px;
+            border-radius: 16px;
             padding: 14px;
             border: 1px solid var(--border);
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .item-card img {
             width: 100%;
-            height: 105px;
-            border-radius: 10px;
+            height: 100px;
+            border-radius: 12px;
             object-fit: cover;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            background: #1e293b;
         }
 
         .item-title {
             font-size: 13px;
             font-weight: 600;
             margin-bottom: 6px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            color: var(--text-main);
         }
 
         .item-price {
             color: var(--accent);
-            font-weight: bold;
+            font-weight: 700;
             font-size: 14px;
             margin-bottom: 10px;
         }
 
         .btn {
             background: var(--accent);
-            color: #0b0f19;
+            color: #ffffff;
             border: none;
-            padding: 10px 12px;
-            border-radius: 10px;
+            padding: 11px 14px;
+            border-radius: 12px;
             font-weight: 700;
             cursor: pointer;
             width: 100%;
             font-size: 13px;
-            box-shadow: 0 4px 12px var(--accent-glow);
-            transition: opacity 0.2s;
+            box-shadow: 0 4px 14px var(--accent-glow);
+            transition: all 0.2s;
         }
 
-        .btn:active { opacity: 0.8; }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
 
         .btn-outline {
             background: transparent;
-            border: 1px solid var(--accent);
-            color: var(--accent);
+            border: 1px solid var(--border);
+            color: var(--text-main);
             box-shadow: none;
         }
 
         .btn-danger {
             background: var(--danger);
             color: white;
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
         }
 
         .balance-box {
             background: var(--card-bg);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 20px;
+            padding: 22px;
             margin-bottom: 20px;
             text-align: center;
         }
 
         .balances span {
-            font-size: 24px;
-            font-weight: 900;
+            font-size: 28px;
+            font-weight: 800;
             color: var(--accent);
             display: block;
-            margin-top: 5px;
+            margin-top: 6px;
         }
 
         .nav-bar {
             position: fixed;
             bottom: 0; left: 0; right: 0;
-            background: var(--card-bg);
+            background: rgba(19, 27, 46, 0.95);
+            backdrop-filter: blur(12px);
             border-top: 1px solid var(--border);
             display: flex;
             justify-content: space-around;
-            padding: 10px 0;
+            padding: 10px 0 16px 0;
             z-index: 100;
             max-width: 480px;
             margin: 0 auto;
@@ -207,16 +208,17 @@
             background: none; border: none;
             color: var(--text-muted);
             font-size: 11px;
+            font-weight: 500;
             display: flex;
             flex-direction: column;
             align-items: center;
             cursor: pointer;
-            gap: 4px;
+            gap: 5px;
             flex: 1;
         }
 
         .nav-item.active { color: var(--accent); }
-        .nav-item svg { width: 20px; height: 20px; fill: currentColor; }
+        .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
 
         .modal {
             display: none;
@@ -227,14 +229,14 @@
             justify-content: center;
             align-items: center;
             padding: 20px;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(6px);
         }
 
         .modal-content {
             background: var(--card-bg);
             border: 1px solid var(--border);
             padding: 24px;
-            border-radius: 18px;
+            border-radius: 20px;
             width: 100%;
             max-width: 340px;
             text-align: center;
@@ -242,30 +244,33 @@
 
         .modal-content input {
             width: 100%;
-            padding: 12px;
+            padding: 12px 14px;
             background: var(--bg-color);
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: 12px;
             color: white;
             margin: 10px 0;
             font-size: 14px;
             text-align: center;
+            outline: none;
         }
 
         .history-list {
-            max-height: 150px;
+            max-height: 160px;
             overflow-y: auto;
-            margin-top: 10px;
+            margin-top: 8px;
             text-align: left;
+            padding-right: 4px;
         }
 
         .history-item {
             font-size: 12px;
             color: var(--text-muted);
-            padding: 6px 0;
+            padding: 8px 0;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
 
         .gallery-grid {
@@ -277,7 +282,7 @@
 
         .gallery-item {
             position: relative;
-            border-radius: 10px;
+            border-radius: 12px;
             overflow: hidden;
             background: var(--bg-color);
             aspect-ratio: 1;
@@ -298,31 +303,32 @@
     <!-- 1. BOSH SAHIFA -->
     <div id="view-home" class="view active">
         <div class="header">
-            <div class="logo-title">PICTURE UZ BOT</div>
-            <div class="status-badge">🟢 Faol</div>
+            <div class="logo-title">PICTURE UZ</div>
+            <div class="status-badge">⭐ Stars & Gifts</div>
         </div>
 
         <div class="balance-box">
-            <div class="section-title" style="justify-content: center;">Mening Balansim</div>
+            <div class="section-title" style="margin-bottom: 4px;">Asosiy Hisob</div>
             <div class="balances">
                 <span id="user-balance">0 so'm</span>
             </div>
-            <button class="btn" style="margin-top: 15px;" onclick="openModal('auto-pay-modal')">💳 Balansni To'ldirish</button>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">Hisobni to'ldirish uchun botga qayting</p>
         </div>
 
         <div class="section-title">AI Rasm Generatori</div>
-        <div style="background: var(--card-bg); padding: 16px; border-radius: 14px; border: 1px solid var(--border); text-align: center;">
-            <input type="text" id="ai-prompt" placeholder="Rasmni tavsiflang..." style="width:100%; padding:12px; background:var(--bg-color); border:1px solid var(--border); border-radius:10px; color:#fff; margin-bottom:12px; font-size:14px;">
+        <div style="background: var(--card-bg); padding: 18px; border-radius: 20px; border: 1px solid var(--border); text-align: center;">
+            <input type="text" id="ai-prompt" placeholder="Rasmni tavsiflang..." style="width:100%; padding:12px 14px; background:var(--bg-color); border:1px solid var(--border); border-radius:12px; color:#fff; margin-bottom:12px; font-size:14px; outline:none;">
             <button class="btn" onclick="generateImage()">✨ Rasm yaratish (2,000 so'm)</button>
         </div>
     </div>
 
-    <!-- 2. SHOP SAHIFASI -->
+    <!-- 2. SHOP SAHIFASI (STARS & GIFTS) -->
     <div id="view-shop" class="view">
         <div class="header">
             <div class="logo-title">SHOP 🛒</div>
-            <div class="status-badge">Mahsulotlar</div>
+            <div class="status-badge">Stars & Gifts</div>
         </div>
+        <div class="section-title" style="margin-bottom: 8px;">Telegram Stars & Sovg'alar</div>
         <div class="grid" id="shop-grid"></div>
     </div>
 
@@ -332,7 +338,7 @@
             <div class="logo-title">AUKSION 🔨</div>
             <div class="status-badge">Bozor</div>
         </div>
-        <button class="btn" style="margin-bottom: 15px;" onclick="openModal('add-auction-modal')">+ Mahsulotni auksionga qo'yish</button>
+        <button class="btn" style="margin-bottom: 16px;" onclick="openModal('add-auction-modal')">+ Mahsulotni auksionga qo'yish</button>
         <div class="grid" id="auction-grid"></div>
     </div>
 
@@ -345,7 +351,7 @@
         </div>
 
         <div class="section-title">Tranzaksiyalar tarixi</div>
-        <div style="background: var(--card-bg); padding: 12px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 16px;">
+        <div style="background: var(--card-bg); padding: 14px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 20px;">
             <div class="history-list" id="transaction-history"></div>
         </div>
 
@@ -357,17 +363,17 @@
     <div id="view-admin" class="view">
         <div class="header">
             <div class="logo-title">ADMIN PANEL</div>
-            <div class="status-badge" style="background: rgba(245, 158, 11, 0.1); color: var(--warning); border-color: rgba(245, 158, 11, 0.3);">Boshqaruv</div>
+            <div class="status-badge" style="background: rgba(245, 158, 11, 0.1); color: var(--warning); border-color: rgba(245, 158, 11, 0.3);">ID: 8694110588</div>
         </div>
         
-        <div style="background: var(--card-bg); padding: 16px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 15px;">
-            <div class="section-title" style="margin-bottom: 10px;">Shop Narxlarini Sozlash</div>
+        <div style="background: var(--card-bg); padding: 18px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 16px;">
+            <div class="section-title" style="margin-bottom: 12px;">Shop Narxlarini Tahrirlash (Stars & Gifts)</div>
             <div id="admin-shop-editor"></div>
         </div>
         
-        <div style="background: var(--card-bg); padding: 16px; border-radius: 14px; border: 1px solid var(--border);">
-            <div class="section-title" style="margin-bottom: 10px;">Tizim Ma'lumotlarini Tozalash</div>
-            <button class="btn btn-danger" onclick="resetSystemData()">Barcha ma'lumotlarni reset qilish</button>
+        <div style="background: var(--card-bg); padding: 18px; border-radius: 20px; border: 1px solid var(--border);">
+            <div class="section-title" style="margin-bottom: 12px;">Xavfsizlik</div>
+            <button class="btn btn-danger" onclick="resetSystemData()">Barcha ma'lumotlarni tozalash</button>
         </div>
     </div>
 
@@ -376,26 +382,11 @@
 <!-- Auksionga mahsulot qo'shish Modali -->
 <div class="modal" id="add-auction-modal">
     <div class="modal-content">
-        <h3>Auksionga qo'shish</h3>
+        <h3 style="margin-bottom: 6px; font-size: 16px;">Auksionga chiqarish</h3>
         <input type="text" id="auction-item-title" placeholder="Mahsulot nomi">
         <input type="number" id="auction-item-price" placeholder="Narxi (so'm)">
-        <button class="btn" onclick="addAuctionItem()">Auksionga chiqarish</button>
-        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('add-auction-modal')">Yopish</button>
-    </div>
-</div>
-
-<!-- Balansni To'ldirish Modali (Chek/Skrinshot yuborish bilan) -->
-<div class="modal" id="auto-pay-modal">
-    <div class="modal-content">
-        <h3>Balansni To'ldirish</h3>
-        <p style="font-size: 12px; color: var(--text-muted); margin: 8px 0;">
-            Karta: <code>8600 0000 0000 0000</code><br>
-            Pul o'tkazib, chek skrinshotini yuboring va summani kiriting (Min: 1,000, Max: 1,000,000):
-        </p>
-        <input type="number" id="custom-pay-amount" placeholder="Summani kiriting (so'm)" min="1000" max="1000000">
-        <input type="file" id="payment-screenshot" accept="image/*" style="font-size: 12px; padding: 6px; background: var(--bg-color); border: 1px solid var(--border); border-radius: 10px; width: 100%; margin-bottom: 10px; color: var(--text-muted);">
-        <button class="btn" onclick="submitPaymentRequest()">To'lovni Tasdiqlatish uchun yuborish</button>
-        <button class="btn btn-outline" style="margin-top: 8px;" onclick="closeModal('auto-pay-modal')">Yopish</button>
+        <button class="btn" onclick="addAuctionItem()">Qo'shish</button>
+        <button class="btn btn-outline" style="margin-top: 10px;" onclick="closeModal('add-auction-modal')">Yopish</button>
     </div>
 </div>
 
@@ -417,7 +408,7 @@
         <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
         Profil
     </button>
-    <button class="nav-item" onclick="switchView('admin', this)" style="color: var(--warning);">
+    <button class="nav-item" onclick="switchView('admin', this)" style="color: var(--warning);" id="admin-nav-btn">
         <svg viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.03 2.18 13.84 2 13.6 2h-4c-.24 0-.43.18-.47.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.23.42.47.42h4c.24 0 .43-.18.47-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
         Admin
     </button>
@@ -427,32 +418,41 @@
     let tg = window.Telegram.WebApp;
     tg.expand();
 
-    const ADMIN_ID = "8694110588";
+    const ADMIN_ID = 8694110588;
     let user = tg.initDataUnsafe?.user;
+    let currentUserId = user ? user.id : ADMIN_ID;
 
-    let userData = JSON.parse(localStorage.getItem('picture_uz_user')) || { balance: 0 };
-    let userGallery = JSON.parse(localStorage.getItem('picture_uz_gallery')) || [];
-    let transactionHistory = JSON.parse(localStorage.getItem('picture_uz_history')) || [];
-    let shopItems = JSON.parse(localStorage.getItem('picture_uz_shop')) || [
-        { id: 1, title: 'Boshlang\'ich Paket', price: 10000, priceText: '10,000 so\'m' },
-        { id: 2, title: 'O\'rta Paket', price: 25000, priceText: '25,000 so\'m' },
-        { id: 3, title: 'Katta Paket', price: 50000, priceText: '50,000 so\'m' }
+    if (currentUserId !== ADMIN_ID) {
+        document.getElementById('admin-nav-btn').style.display = 'none';
+    }
+
+    let userData = JSON.parse(localStorage.getItem('picture_uz_v5_user_' + currentUserId)) || { balance: 1000 }; // Sinov uchun 1000 so'm qo'yildi
+    let userGallery = JSON.parse(localStorage.getItem('picture_uz_v5_gallery_' + currentUserId)) || [];
+    let transactionHistory = JSON.parse(localStorage.getItem('picture_uz_v5_history_' + currentUserId)) || [];
+    
+    let shopItems = JSON.parse(localStorage.getItem('picture_uz_v5_shop')) || [
+        { id: 1, title: '⭐ 50 Telegram Stars', price: 15000, priceText: '15,000 so\'m' },
+        { id: 2, title: '⭐ 100 Telegram Stars', price: 29000, priceText: '29,000 so\'m' },
+        { id: 3, title: '🎁 Telegram Gift (Rose)', price: 12000, priceText: '12,000 so\'m' },
+        { id: 4, title: '🎁 Telegram Gift (Box)', price: 25000, priceText: '25,000 so\'m' }
     ];
-    let auctionItems = JSON.parse(localStorage.getItem('picture_uz_auction')) || [];
+    let auctionItems = JSON.parse(localStorage.getItem('picture_uz_v5_auction')) || [];
 
     function updateUI() {
         document.getElementById('user-balance').innerText = userData.balance.toLocaleString() + " so'm";
         if (user) {
             document.getElementById('profile-name').innerText = user.first_name || "Foydalanuvchi";
-            document.getElementById('profile-id').innerText = "ID: " + (user.id || ADMIN_ID);
+            document.getElementById('profile-id').innerText = "ID: " + currentUserId;
             if (user.photo_url) document.getElementById('user-avatar').src = user.photo_url;
+        } else {
+            document.getElementById('profile-id').innerText = "ID: " + ADMIN_ID;
         }
         
-        localStorage.setItem('picture_uz_user', JSON.stringify(userData));
-        localStorage.setItem('picture_uz_shop', JSON.stringify(shopItems));
-        localStorage.setItem('picture_uz_gallery', JSON.stringify(userGallery));
-        localStorage.setItem('picture_uz_history', JSON.stringify(transactionHistory));
-        localStorage.setItem('picture_uz_auction', JSON.stringify(auctionItems));
+        localStorage.setItem('picture_uz_v5_user_' + currentUserId, JSON.stringify(userData));
+        localStorage.setItem('picture_uz_v5_shop', JSON.stringify(shopItems));
+        localStorage.setItem('picture_uz_v5_gallery_' + currentUserId, JSON.stringify(userGallery));
+        localStorage.setItem('picture_uz_v5_history_' + currentUserId, JSON.stringify(transactionHistory));
+        localStorage.setItem('picture_uz_v5_auction', JSON.stringify(auctionItems));
         
         renderShop();
         renderAuction();
@@ -476,40 +476,16 @@
         if (transactionHistory.length > 20) transactionHistory.pop();
     }
 
-    function submitPaymentRequest() {
-        let amount = Number(document.getElementById('custom-pay-amount').value);
-        let screenshot = document.getElementById('payment-screenshot').files[0];
-
-        if (!amount || amount < 1000 || amount > 1000000) {
-            alert("Iltimos, 1,000 so'mdan 1,000,000 so'mgacha bo'lgan to'g'ri miqdorni kiriting!");
-            return;
-        }
-        if (!screenshot) {
-            alert("Iltimos, to'lov cheki skrinshotini yuklang!");
-            return;
-        }
-
-        closeModal('auto-pay-modal');
-        
-        // Telegram bot orqali adminga yuborish simulatsiyasi yoki avtomatik qabul qilish
-        // Real botda bu yerda fetch orqali adminda skrinshot va summa ko'rsatiladi.
-        userData.balance += amount; // Vaqtincha avtomatik qo'shiladi, xohlasangiz buni olib tashlab faqat adminga yuborishingiz mumkin.
-        addHistory("Balans to'ldirildi (Chek)", "+" + amount.toLocaleString() + " so'm");
-        updateUI();
-
-        alert(`✅ To'lov talabingiz yuborildi! Skrinshot qabul qilindi va balansingizga ${amount.toLocaleString()} so'm qo'shildi.`);
-        document.getElementById('custom-pay-amount').value = '';
-        document.getElementById('payment-screenshot').value = '';
-    }
-
     function renderShop() {
         let grid = document.getElementById('shop-grid');
         grid.innerHTML = '';
         shopItems.forEach((item, index) => {
             grid.innerHTML += `
                 <div class="item-card">
-                    <div class="item-title">${item.title}</div>
-                    <div class="item-price">${item.priceText}</div>
+                    <div>
+                        <div class="item-title">${item.title}</div>
+                        <div class="item-price">${item.priceText}</div>
+                    </div>
                     <button class="btn" onclick="buyShopItem(${index})">Sotib olish</button>
                 </div>
             `;
@@ -518,7 +494,7 @@
 
     function buyShopItem(index) {
         let item = shopItems[index];
-        if (userData.balance < item.price) { alert("Balansingizda mablag' yetarli emas!"); return; }
+        if (userData.balance < item.price) { alert("Balansingizda mablag' yetarli emas! Bot orqali hisobni to'ldiring."); return; }
         userData.balance -= item.price;
         addHistory("Xarid: " + item.title, "-" + item.price.toLocaleString() + " so'm");
         updateUI();
@@ -529,15 +505,17 @@
         let grid = document.getElementById('auction-grid');
         grid.innerHTML = '';
         if(auctionItems.length === 0) {
-            grid.innerHTML = '<p style="color:var(--text-muted); font-size:13px; grid-column: span 2; text-align:center;">Auksionda mahsulotlar yo\'q</p>';
+            grid.innerHTML = '<p style="color:var(--text-muted); font-size:12px; grid-column: span 2; text-align:center; padding: 20px;">Auksionda mahsulotlar yo\'q</p>';
             return;
         }
         auctionItems.forEach((item, index) => {
             grid.innerHTML += `
                 <div class="item-card">
-                    <img src="${item.img}" alt="Auction Item">
-                    <div class="item-title">${item.title}</div>
-                    <div class="item-price">${item.price.toLocaleString()} so'm</div>
+                    <div>
+                        <img src="${item.img}" alt="Item">
+                        <div class="item-title">${item.title}</div>
+                        <div class="item-price">${item.price.toLocaleString()} so'm</div>
+                    </div>
                     <button class="btn" onclick="buyAuctionItem(${index})">Xarid qilish</button>
                 </div>
             `;
@@ -577,10 +555,10 @@
         container.innerHTML = '';
         shopItems.forEach((item, index) => {
             container.innerHTML += `
-                <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-                    <input type="text" id="admin-title-${index}" value="${item.title}" style="margin:0; padding:8px; font-size:12px;">
-                    <input type="number" id="admin-price-num-${index}" value="${item.price}" style="margin:0; padding:8px; width:110px; font-size:12px;" placeholder="Narx">
-                    <button class="btn" style="width:auto; padding:8px 12px; margin:0;" onclick="saveShopItem(${index})">Saqlash</button>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
+                    <input type="text" id="admin-title-${index}" value="${item.title}" style="margin:0; padding:8px 10px; font-size:12px; background:var(--bg-color); border:1px solid var(--border); border-radius:8px; color:#fff; flex:1; outline:none;">
+                    <input type="number" id="admin-price-num-${index}" value="${item.price}" style="margin:0; padding:8px 10px; width:100px; font-size:12px; background:var(--bg-color); border:1px solid var(--border); border-radius:8px; color:#fff; outline:none;" placeholder="Narx">
+                    <button class="btn" style="width:auto; padding:8px 12px; margin:0; font-size:12px;" onclick="saveShopItem(${index})">Saqlash</button>
                 </div>
             `;
         });
@@ -596,18 +574,19 @@
 
     function generateImage() {
         let prompt = document.getElementById('ai-prompt').value;
-        if (!prompt) { alert("Tavsif yozing!"); return; }
-        if (userData.balance < 2000) { alert("Balansingizda mablag' yetarli emas! (Narxi: 2,000 so'm)"); return; }
+        if (!prompt) { alert("Iltimos, rasm uchun tavsif yozing!"); return; }
+        if (userData.balance < 2000) { alert("Balansingizda mablag' yetarli emas! (Rasm narxi: 2,000 so'm)"); return; }
         userData.balance -= 2000;
         addHistory("AI Rasm yaratish", "-2,000 so'm");
         
         let sampleImages = [
             "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=300",
-            "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=300"
+            "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=300",
+            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300"
         ];
         userGallery.unshift({ url: sampleImages[Math.floor(Math.random() * sampleImages.length)] });
         updateUI();
-        alert("✨ Rasm yaratildi va Profilingizdagi galereyaga qo'shildi!");
+        alert("✨ Rasm muvaffaqiyatli yaratildi va galereyangizga qo'shildi!");
         document.getElementById('ai-prompt').value = '';
     }
 
@@ -615,7 +594,7 @@
         let galleryEl = document.getElementById('user-gallery');
         galleryEl.innerHTML = '';
         if(userGallery.length === 0) {
-            galleryEl.innerHTML = '<p style="color:var(--text-muted); font-size:13px; grid-column: span 3; text-align:center;">Rasmlar yo\'q</p>';
+            galleryEl.innerHTML = '<p style="color:var(--text-muted); font-size:12px; grid-column: span 3; text-align:center; padding: 15px;">Rasmlar hali yo\'q</p>';
             return;
         }
         userGallery.forEach(img => {
@@ -627,13 +606,13 @@
         let historyEl = document.getElementById('transaction-history');
         historyEl.innerHTML = '';
         if(transactionHistory.length === 0) {
-            historyEl.innerHTML = '<p style="color:var(--text-muted); font-size:12px; text-align:center;">Tarix bo\'sh</p>';
+            historyEl.innerHTML = '<p style="color:var(--text-muted); font-size:12px; text-align:center; padding: 10px;">Tranzaksiyalar tarixi bo\'sh</p>';
             return;
         }
         transactionHistory.forEach(h => {
             historyEl.innerHTML += `
                 <div class="history-item">
-                    <span>${h.text} (${h.time})</span>
+                    <span>${h.text} <span style="font-size:10px; color:var(--text-muted);">(${h.time})</span></span>
                     <strong style="color: ${h.amount.includes('+') ? 'var(--accent)' : 'var(--danger)'};">${h.amount}</strong>
                 </div>
             `;
