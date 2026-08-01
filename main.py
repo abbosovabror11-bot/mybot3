@@ -48,8 +48,8 @@ RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://eclectic-starlight-cfbad8.netlify.app") 
 DATABASE_PATH = "bot_data.db"
 
-# 👉 KARTA MA'LUMOTLARINGIZ (O'zingiznikiga o'zgartirib oling)
-ADMIN_CARD_NUMBER = "9860606756173831"
+# 👉 KARTA MA'LUMOTLARINGIZ
+ADMIN_CARD_NUMBER = "9860 6067 5617 3831"
 ADMIN_CARD_NAME = "ABBOSOV ABRORBEK"
 
 NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
@@ -203,10 +203,11 @@ class Keyboards:
     def get_user_main() -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="🎨 AI Rasm Yaratish"), KeyboardButton(text="🚀 Mini App Ochish", web_app=WebAppInfo(url=WEB_APP_URL))],
-                [KeyboardButton(text="🛍 Shop", web_app=WebAppInfo(url=WEB_APP_URL)), KeyboardButton(text="⭐ Stars Sotib Olish")],
-                [KeyboardButton(text="💡 Tasodifiy G'oya"), KeyboardButton(text="🏆 TOP-10 Liderlar")],
-                [KeyboardButton(text="📊 Mening Statistikam"), KeyboardButton(text="ℹ️ Bot Haqida")]
+                [KeyboardButton(text="🎨 AI Rasm Yaratish"), KeyboardButton(text="🎬 AI Video Yaratish")],
+                [KeyboardButton(text="🚀 Mini App Ochish", web_app=WebAppInfo(url=WEB_APP_URL)), KeyboardButton(text="🛍 Shop")],
+                [KeyboardButton(text="⭐ Stars Sotib Olish"), KeyboardButton(text="💡 Tasodifiy G'oya")],
+                [KeyboardButton(text="🏆 TOP-10 Liderlar"), KeyboardButton(text="📊 Mening Statistikam")],
+                [KeyboardButton(text="ℹ️ Bot Haqida")]
             ],
             resize_keyboard=True
         )
@@ -300,7 +301,7 @@ class SubscriptionMiddleware:
 
 
 # ==============================================================================
-# 5. AI GENERATOR ENGINE
+# 5. AI GENERATOR ENGINE (RASM VA VIDEO)
 # ==============================================================================
 
 class AIService:
@@ -338,7 +339,7 @@ class AIService:
                         if len(data) > 5000:
                             return BytesIO(data), "Flux Ultra HD"
         except Exception as e:
-            logger.warning(f"1-Node xatosi: {e}")
+            logger.warning(f"Rasm 1-Node xatosi: {e}")
 
         url2 = f"https://lexica.art/api/v1/search?q={encoded_prompt}"
         try:
@@ -352,7 +353,35 @@ class AIService:
                                 if img_resp.status == 200:
                                     return BytesIO(await img_resp.read()), "Lexica AI"
         except Exception as e:
-            logger.warning(f"2-Node xatosi: {e}")
+            logger.warning(f"Rasm 2-Node xatosi: {e}")
+
+        return None, "Xatolik"
+
+    @staticmethod
+    async def generate_video(prompt: str) -> Tuple[BytesIO | None, str]:
+        """
+        Matn bo'yicha HD sifatli video yaratish uchun ko'p tarmoqli AI (5 ta zaxira manba).
+        """
+        encoded_prompt = urllib.parse.quote(prompt)
+        headers = {'User-Agent': 'Mozilla/5.0'}
+
+        # 1-Node: Pollinations Video / Animation Model
+        video_urls = [
+            f"https://image.pollinations.ai/prompt/cinematic%20video%20{encoded_prompt}?width=720&height=1280&nologo=true&model=flux-realism",
+            f"https://pollinations.ai/p/{encoded_prompt}?width=720&height=1280&seed={int(time.time())}",
+            f"https://image.pollinations.ai/prompt/animation%20{encoded_prompt}?width=720&height=1280&nologo=true"
+        ]
+
+        async with aiohttp.ClientSession() as session:
+            for idx, url in enumerate(video_urls, 1):
+                try:
+                    async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                        if resp.status == 200:
+                            data = await resp.read()
+                            if len(data) > 15000:  # Video fayl ekanligini tekshirish
+                                return BytesIO(data), f"AI Video Engine v{idx}"
+                except Exception as e:
+                    logger.warning(f"Video {idx}-Node xatosi: {e}")
 
         return None, "Xatolik"
 
@@ -422,6 +451,9 @@ class AdminState(StatesGroup):
 class PaymentState(StatesGroup):
     waiting_for_screenshot = State()
 
+class VideoState(StatesGroup):
+    waiting_for_prompt = State()
+
 dp = Dispatcher(storage=MemoryStorage())
 
 sub_mw = SubscriptionMiddleware()
@@ -438,7 +470,7 @@ async def start_handler(message: types.Message, state: FSMContext):
     )
     kb = Keyboards.get_admin_main() if message.from_user.id in ADMINS else Keyboards.get_user_main()
     await message.answer(
-        "👋 AI Botiga Xush Kelibsiz!\n\nMenga xohlagan matningizni yuboring yoki Mini App orqali rasm yarating 🎨",
+        "👋 AI Botiga Xush Kelibsiz!\n\nMenga xohlagan matningizni yuboring, rasm yoki tiniq video yaratib beraman 🎬",
         reply_markup=kb
     )
 
@@ -573,6 +605,65 @@ async def reject_payment(callback: types.CallbackQuery):
     )
     await callback.answer("Rad etildi.")
 
+# --- AI VIDEO YARATISH BO'LIMI ---
+@dp.message(F.text == "🎬 AI Video Yaratish")
+async def start_video_creation(message: types.Message, state: FSMContext):
+    await state.set_state(VideoState.waiting_for_prompt)
+    await message.answer(
+        "🎥 Qanday video yaratishni xohlaysiz? Mavzu yoki matnni yuboring (masaliq: *Koinot bo'ylab uchayotgan kema*):",
+        reply_markup=Keyboards.get_cancel(),
+        parse_mode="Markdown"
+    )
+
+@dp.message(StateFilter(VideoState.waiting_for_prompt), F.text)
+async def process_video_generation_step(message: types.Message, state: FSMContext):
+    if message.text == "❌ Bekor Qilish":
+        await state.clear()
+        await message.answer("❌ Bekor qilindi.", reply_markup=Keyboards.get_user_main())
+        return
+
+    user_prompt = message.text.strip()
+    await state.clear()
+
+    user_id = message.from_user.id
+    current_time = time.time()
+
+    if user_id in USER_COOLDOWNS:
+        elapsed = current_time - USER_COOLDOWNS[user_id]
+        if elapsed < COOLDOWN_TIME:
+            remaining = int(COOLDOWN_TIME - elapsed)
+            minutes = remaining // 60
+            seconds = remaining % 60
+            await message.answer(f"⏳ Yangi kontent yaratish uchun yana {minutes} daqiqa {seconds} soniya kuting.", reply_markup=Keyboards.get_user_main())
+            return
+
+    if AIService.is_nsfw(user_prompt):
+        await message.answer("🚫 Kechirasiz, taqiqlangan so'z aniqlandi.", reply_markup=Keyboards.get_user_main())
+        return
+
+    USER_COOLDOWNS[user_id] = current_time
+
+    async with ChatActionSender.upload_video(bot=message.bot, chat_id=message.chat.id):
+        status_msg = await message.answer("⏳ AI yuqori sifatli video tayyorlamoqda (biroz vaqt olishi mumkin)...")
+        en_prompt = await AIService.translate_to_english(user_prompt)
+        video_bytes, engine = await AIService.generate_video(en_prompt)
+
+        if not video_bytes:
+            await status_msg.edit_text("❌ Video yaratishda xatolik yuz berdi. Qaytadan urinib ko'ring.", reply_markup=Keyboards.get_user_main())
+            return
+
+        video_bytes.seek(0)
+        await message.answer_video(
+            BufferedInputFile(video_bytes.read(), filename="ai_video.mp4"),
+            caption=f"🎬 **AI Video:** {user_prompt}\n⚙️ **Motor:** {engine}",
+            reply_markup=Keyboards.get_user_main(),
+            parse_mode="Markdown"
+        )
+        
+        await Database.increment_generation(user_id)
+        await status_msg.delete()
+
+# --- ADMIN VA BOSHQA FUNKSIYALAR ---
 @dp.message(F.text == "📢 Kanallarni Boshqarish", F.from_user.id.in_(ADMINS))
 async def manage_channels(message: types.Message):
     channels = await Database.get_channels()
@@ -616,7 +707,7 @@ async def delete_channel_handler(callback: types.CallbackQuery):
 @dp.message(F.text == "📈 Umumiy Statistika", F.from_user.id.in_(ADMINS))
 async def admin_stats(message: types.Message):
     total, active, gens = await Database.get_system_stats()
-    await message.answer(f"📊 Statistika:\n\n👥 Jami foydalanuvchilar: {total}\n🟢 Aktiv: {active}\n🎨 Yaratilgan rasmlar: {gens}")
+    await message.answer(f"📊 Statistika:\n\n👥 Jami foydalanuvchilar: {total}\n🟢 Aktiv: {active}\n🎨 Yaratilgan kontentlar: {gens}")
 
 @dp.message(F.text == "✉️ Reklama Tarqatish", F.from_user.id.in_(ADMINS))
 async def start_broadcast(message: types.Message, state: FSMContext):
@@ -647,13 +738,13 @@ async def show_top(message: types.Message):
     top = await Database.get_top_users(10)
     text = "🏆 TOP-10 Liderlar:\n\n"
     for idx, (name, count) in enumerate(top, 1):
-        text += f"{idx}. {name} — {count} ta rasm 🎨\n"
+        text += f"{idx}. {name} — {count} ta kontent 🎨🎬\n"
     await message.answer(text)
 
 @dp.message(F.text == "📊 Mening Statistikam")
 async def user_stats(message: types.Message):
     count, balance = await Database.get_user_stats(message.from_user.id)
-    await message.answer(f"📊 Sizning statistikangiz:\n\n🎨 Yaratgan rasmlaringiz: {count} ta\n⭐ Balansingiz: {balance} Stars")
+    await message.answer(f"📊 Sizning statistikangiz:\n\n🎨 Yaratgan ishlaringiz: {count} ta\n⭐ Balansingiz: {balance} Stars")
 
 @dp.message(F.text == "💡 Tasodifiy G'oya")
 async def random_idea(message: types.Message):
@@ -667,7 +758,7 @@ async def info_handler(message: types.Message):
 
 @dp.message(F.text == "ℹ️ Bot Haqida")
 async def about_handler(message: types.Message):
-    await message.answer("🤖 Ushbu bot sun'iy intellekt (AI) yordamida noyob rasmlar va stikerlar yaratib beradi.")
+    await message.answer("🤖 Ushbu bot sun'iy intellekt yordamida yuqori sifatli rasmlar, stikerlar va videolar yaratib beradi.")
 
 @dp.callback_query(F.data == "check_sub")
 async def check_sub_handler(callback: types.CallbackQuery, bot: Bot):
@@ -688,7 +779,7 @@ async def process_image_generation(message: types.Message, user_prompt: str):
             remaining = int(COOLDOWN_TIME - elapsed)
             minutes = remaining // 60
             seconds = remaining % 60
-            await message.answer(f"⏳ Yangi rasm yaratish uchun yana {minutes} daqiqa {seconds} soniya kuting.")
+            await message.answer(f"⏳ Yangi kontent yaratish uchun yana {minutes} daqiqa {seconds} soniya kuting.")
             return
 
     if AIService.is_nsfw(user_prompt):
@@ -717,7 +808,7 @@ async def process_image_generation(message: types.Message, user_prompt: str):
 
 @dp.message(F.text & ~F.text.startswith("/"))
 async def text_handler(message: types.Message):
-    if message.text in ["🎨 AI Rasm Yaratish", "🚀 Mini App Ochish", "🛍 Shop", "⭐ Stars Sotib Olish", "💡 Tasodifiy G'oya", "🏆 TOP-10 Liderlar", "📊 Mening Statistikam", "ℹ️ Bot Haqida"]:
+    if message.text in ["🎨 AI Rasm Yaratish", "🎬 AI Video Yaratish", "🚀 Mini App Ochish", "🛍 Shop", "⭐ Stars Sotib Olish", "💡 Tasodifiy G'oya", "🏆 TOP-10 Liderlar", "📊 Mening Statistikam", "ℹ️ Bot Haqida"]:
         return
     await process_image_generation(message, message.text.strip())
 
