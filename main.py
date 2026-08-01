@@ -10,7 +10,8 @@ from typing import List, Tuple, Dict, Any, Callable, Awaitable
 import aiohttp
 import aiosqlite
 from PIL import Image
-from flask import Thread, Flask
+from flask import Flask
+from threading import Thread
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, StateFilter, CommandStart
@@ -26,13 +27,12 @@ from aiogram.types import (
     KeyboardButton,
     Message,
     CallbackQuery,
-    TelegramObject,
     WebAppInfo
 )
 from aiogram.utils.chat_action import ChatActionSender
 
 # ==============================================================================
-# 1. KONFIGURATSIYA (Flask Web Server for Render Web Service)
+# 1. FLASK WEB SERVER (Render Web Service talabi uchun)
 # ==============================================================================
 
 app = Flask(__name__)
@@ -45,14 +45,17 @@ def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAENRvJL44yxjUSFhFDp5ygO9zFp-_yzMQc")
+# ==============================================================================
+# 2. KONFIGURATSIYA
+# ==============================================================================
+
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAENRvJL44yxjUSFhFDp5yg09zFp-_yzMQc")
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://eclectic-starlight-cfbad8.netlify.app") 
 DATABASE_PATH = "bot_data.db"
 
-# 👉 KARTA MA'LUMOTLARINGIZ
 ADMIN_CARD_NUMBER = "9860 6067 5617 3831"
 ADMIN_CARD_NAME = "ABDOSOV ABRORBEK"
 
@@ -70,7 +73,7 @@ logger = logging.getLogger("ProductionAIBot")
 
 
 # ==============================================================================
-# 2. MA'LUMOTLAR BAZASI
+# 3. MA'LUMOTLAR BAZASI
 # ==============================================================================
 
 class Database:
@@ -199,7 +202,7 @@ class Database:
 
 
 # ==============================================================================
-# 3. KEYBOARDS
+# 4. KEYBOARDS
 # ==============================================================================
 
 class Keyboards:
@@ -245,7 +248,7 @@ class Keyboards:
 
 
 # ==============================================================================
-# 4. MAJBURIY OBUNA TEKSHIRUVI
+# 5. MAJBURIY OBUNA TEKSHIRUVI
 # ==============================================================================
 
 async def check_user_subscriptions(bot: Bot, user_id: int) -> List[Tuple[str, str]]:
@@ -265,8 +268,8 @@ async def check_user_subscriptions(bot: Bot, user_id: int) -> List[Tuple[str, st
 class SubscriptionMiddleware:
     async def __call__(
         self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
+        handler: Callable[[types.TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: types.TelegramObject,
         data: Dict[str, Any]
     ) -> Any:
         bot: Bot = data['bot']
@@ -305,7 +308,7 @@ class SubscriptionMiddleware:
 
 
 # ==============================================================================
-# 5. AI GENERATOR ENGINE
+# 6. AI GENERATOR ENGINE
 # ==============================================================================
 
 class AIService:
@@ -397,7 +400,7 @@ class AIService:
 
 
 # ==============================================================================
-# 6. HANDLERLAR
+# 7. HANDLERLAR
 # ==============================================================================
 
 class AdminState(StatesGroup):
@@ -561,7 +564,6 @@ async def reject_payment(callback: types.CallbackQuery):
     )
     await callback.answer("Rad etildi.")
 
-# --- AI VIDEO YARATISH BO'LIMI ---
 @dp.message(F.text == "🎬 AI Video Yaratish")
 async def start_video_creation(message: types.Message, state: FSMContext):
     await state.set_state(VideoState.waiting_for_prompt)
@@ -619,7 +621,6 @@ async def process_video_generation_step(message: types.Message, state: FSMContex
         await Database.increment_generation(user_id)
         await status_msg.delete()
 
-# --- ADMIN VA BOSHQA FUNKSIYALAR ---
 @dp.message(F.text == "📢 Kanallarni Boshqarish", F.from_user.id.in_(ADMINS))
 async def manage_channels(message: types.Message):
     channels = await Database.get_channels()
@@ -770,12 +771,10 @@ async def text_handler(message: types.Message):
 
 
 # ==============================================================================
-# 7. ISHGA TUSHIRISH (Flask + Telegram Bot birga)
+# 8. ISHGA TUSHIRISH (Flask + Telegram Bot)
 # ==============================================================================
 
 async def main():
-    # Flask serverini fon rejimida (Thread) ishga tushiramiz
-    from threading import Thread
     server_thread = Thread(target=run_web_server)
     server_thread.daemon = True
     server_thread.start()
