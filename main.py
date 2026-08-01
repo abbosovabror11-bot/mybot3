@@ -39,7 +39,7 @@ from aiogram.utils.chat_action import ChatActionSender
 # 1. KONFIGURATSIYA
 # ==============================================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAGxdKm-7d6cjFet5hnk2OD5Lu5h6T_7Tvk")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAENRvJL44yxjUSFhFDp5ygO9zFp-_yzMQc")
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
