@@ -3,5 +3,7 @@ aiohttp
 aiosqlite
 Pillow
 Flask
+pydantic-core==2.23.4
+
 
 
