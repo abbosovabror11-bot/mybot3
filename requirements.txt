@@ -1,9 +1,9 @@
-aiogram==3.13.1
+pyTelegramBotAPI==4.23.0
 aiohttp
 aiosqlite
 Pillow
 Flask
-pydantic-core==2.23.4
+
 
 
 
