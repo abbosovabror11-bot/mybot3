@@ -10,6 +10,7 @@ from typing import List, Tuple, Dict, Any, Callable, Awaitable
 import aiohttp
 import aiosqlite
 from PIL import Image
+from flask import Thread, Flask
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, StateFilter, CommandStart
@@ -31,8 +32,18 @@ from aiogram.types import (
 from aiogram.utils.chat_action import ChatActionSender
 
 # ==============================================================================
-# 1. KONFIGURATSIYA
+# 1. KONFIGURATSIYA (Flask Web Server for Render Web Service)
 # ==============================================================================
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running and Mini App is active!"
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAENRvJL44yxjUSFhFDp5ygO9zFp-_yzMQc")
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
@@ -294,7 +305,7 @@ class SubscriptionMiddleware:
 
 
 # ==============================================================================
-# 5. AI GENERATOR ENGINE (RASM VA VIDEO)
+# 5. AI GENERATOR ENGINE
 # ==============================================================================
 
 class AIService:
@@ -759,13 +770,19 @@ async def text_handler(message: types.Message):
 
 
 # ==============================================================================
-# 7. ISHGA TUSHIRISH
+# 7. ISHGA TUSHIRISH (Flask + Telegram Bot birga)
 # ==============================================================================
 
 async def main():
+    # Flask serverini fon rejimida (Thread) ishga tushiramiz
+    from threading import Thread
+    server_thread = Thread(target=run_web_server)
+    server_thread.daemon = True
+    server_thread.start()
+
     await Database.init_db()
     bot = Bot(token=BOT_TOKEN)
-    logger.info("Bot ishga tushmoqda...")
+    logger.info("Bot va Web Server birga ishga tushmoqda...")
     try:
         await dp.start_polling(bot)
     finally:
