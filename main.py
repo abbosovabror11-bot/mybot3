@@ -5,16 +5,11 @@ import sys
 import time
 import urllib.parse
 from io import BytesIO
-from typing import Callable, Dict, Any, Awaitable, List, Tuple
+from typing import List, Tuple, Dict, Any, Callable, Awaitable
 
 import aiohttp
 import aiosqlite
 from PIL import Image
-from aiohttp import web
-
-from fastapi import FastAPI
-import uvicorn
-import threading
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, StateFilter, CommandStart
@@ -43,16 +38,14 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAENRvJL44yxjUSFhFDp5ygO9zFp-_yzM
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
-PORT = int(os.getenv("PORT", 8080))
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://eclectic-starlight-cfbad8.netlify.app") 
 DATABASE_PATH = "bot_data.db"
 
 # 👉 KARTA MA'LUMOTLARINGIZ
 ADMIN_CARD_NUMBER = "9860 6067 5617 3831"
-ADMIN_CARD_NAME = "ABBOSOV ABRORBEK"
+ADMIN_CARD_NAME = "ABDOSOV ABRORBEK"
 
-NSFW_WORDS = ["nude", "naked", "sex", "porn", "hentai", "xxx", "erotic", "bikini", "jalap", "yalang'och", "jinsiy"]
+NSFW_WORDS = ["xxx", "erotic", "bikini", "jalap"]
 
 USER_COOLDOWNS = {}
 COOLDOWN_TIME = 120  # 2 daqiqa
@@ -359,13 +352,9 @@ class AIService:
 
     @staticmethod
     async def generate_video(prompt: str) -> Tuple[BytesIO | None, str]:
-        """
-        Matn bo'yicha HD sifatli video yaratish uchun ko'p tarmoqli AI (5 ta zaxira manba).
-        """
         encoded_prompt = urllib.parse.quote(prompt)
         headers = {'User-Agent': 'Mozilla/5.0'}
 
-        # 1-Node: Pollinations Video / Animation Model
         video_urls = [
             f"https://image.pollinations.ai/prompt/cinematic%20video%20{encoded_prompt}?width=720&height=1280&nologo=true&model=flux-realism",
             f"https://pollinations.ai/p/{encoded_prompt}?width=720&height=1280&seed={int(time.time())}",
@@ -378,7 +367,7 @@ class AIService:
                     async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                         if resp.status == 200:
                             data = await resp.read()
-                            if len(data) > 15000:  # Video fayl ekanligini tekshirish
+                            if len(data) > 15000:
                                 return BytesIO(data), f"AI Video Engine v{idx}"
                 except Exception as e:
                     logger.warning(f"Video {idx}-Node xatosi: {e}")
@@ -397,51 +386,7 @@ class AIService:
 
 
 # ==============================================================================
-# 6. WEB SERVER & FASTAPI (Mini App uchun)
-# ==============================================================================
-
-app = FastAPI()
-
-@app.get("/ping")
-async def handle_ping():
-    return {"status": "ok", "message": "Bot is live 24/7!"}
-
-@app.get("/api/get_balance/{user_id}")
-async def api_get_balance(user_id: int):
-    _, balance = await Database.get_user_stats(user_id)
-    return {"user_id": user_id, "balance": balance}
-
-async def start_web_server():
-    app_web = web.Application()
-    app_web.router.add_get("/", lambda req: web.Response(text="Bot is live!", status=200))
-    app_web.router.add_get("/ping", lambda req: web.Response(text="pong", status=200))
-    
-    runner = web.AppRunner(app_web)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-    logger.info("AIOHTTP & FastAPI serverlar ishga tushdi!")
-
-def run_fastapi():
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="warning")
-
-async def self_ping_loop():
-    await asyncio.sleep(10)
-    if not RENDER_EXTERNAL_URL:
-        return
-    ping_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/ping"
-    while True:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(ping_url, timeout=10) as resp:
-                    pass
-        except Exception as e:
-            logger.warning(f"Ping xatosi: {e}")
-        await asyncio.sleep(240)
-
-
-# ==============================================================================
-# 7. HANDLERLAR
+# 6. HANDLERLAR
 # ==============================================================================
 
 class AdminState(StatesGroup):
@@ -610,7 +555,7 @@ async def reject_payment(callback: types.CallbackQuery):
 async def start_video_creation(message: types.Message, state: FSMContext):
     await state.set_state(VideoState.waiting_for_prompt)
     await message.answer(
-        "🎥 Qanday video yaratishni xohlaysiz? Mavzu yoki matnni yuboring (masaliq: *Koinot bo'ylab uchayotgan kema*):",
+        "🎥 Qanday video yaratishni xohlaysiz? Mavzu yoki matnni yuboring (masalan: *Koinot bo'ylab uchayotgan kema*):",
         reply_markup=Keyboards.get_cancel(),
         parse_mode="Markdown"
     )
@@ -814,21 +759,13 @@ async def text_handler(message: types.Message):
 
 
 # ==============================================================================
-# 8. ISHGA TUSHIRISH
+# 7. ISHGA TUSHIRISH
 # ==============================================================================
 
 async def main():
     await Database.init_db()
     bot = Bot(token=BOT_TOKEN)
-    
-    asyncio.create_task(start_web_server())
-    
-    fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
-    fastapi_thread.start()
-    
-    asyncio.create_task(self_ping_loop())
-    
-    logger.info("Bot va Mini App API backend ishga tushdi!")
+    logger.info("Bot ishga tushmoqda...")
     try:
         await dp.start_polling(bot)
     finally:
