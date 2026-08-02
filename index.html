@@ -3,631 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PICTURE UZ - Pro Store</title>
+    <title>Mening Statistikam</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            --bg-color: #0b0f19;
-            --card-bg: #131b2e;
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.25);
-            --text-main: #ffffff;
-            --text-muted: #94a3b8;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --border: #1e293b;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            -webkit-tap-highlight-color: transparent;
+            --bg-color: var(--tg-theme-bg-color, #f4f4f5);
+            --text-color: var(--tg-theme-text-color, #111827);
+            --hint-color: var(--tg-theme-hint-color, #6b7280);
+            --card-bg: var(--tg-theme-secondary-bg-color, #ffffff);
+            --button-color: var(--tg-theme-button-color, #2563eb);
+            --button-text: var(--tg-theme-button-text-color, #ffffff);
         }
 
         body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
-            color: var(--text-main);
-            padding-bottom: 90px;
+            color: var(--text-color);
+            margin: 0;
+            padding: 16px;
+            box-sizing: border-box;
         }
 
         .container {
-            max-width: 480px;
+            max-width: 600px;
             margin: 0 auto;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .stats-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
             padding: 16px;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            background: var(--card-bg);
-            padding: 14px 18px;
-            border-radius: 16px;
-            border: 1px solid var(--border);
-        }
-
-        .logo-title {
-            font-size: 18px;
-            font-weight: 800;
-            color: var(--accent);
-        }
-
-        .status-badge {
-            font-size: 11px;
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--accent);
-            padding: 4px 10px;
-            border-radius: 20px;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            font-weight: 600;
-        }
-
-        .view { display: none; }
-        .view.active { display: block; animation: fadeIn 0.25s ease-in-out; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .profile-card {
-            background: var(--card-bg);
-            border-radius: 20px;
-            padding: 24px 16px;
-            text-align: center;
-            margin-bottom: 20px;
-            border: 1px solid var(--border);
-        }
-
-        .avatar {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            border: 2px solid var(--accent);
-            margin: 0 auto 12px;
-            object-fit: cover;
-            box-shadow: 0 0 20px var(--accent-glow);
-        }
-
-        .username { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-        .user-id { color: var(--text-muted); font-size: 13px; }
-
-        .section-title {
-            font-size: 14px;
-            font-weight: 700;
             margin-bottom: 12px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 14px;
-        }
-
-        .item-card {
-            background: var(--card-bg);
-            border-radius: 16px;
-            padding: 14px;
-            border: 1px solid var(--border);
-            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             display: flex;
-            flex-direction: column;
             justify-content: space-between;
-        }
-
-        .item-card img {
-            width: 100%;
-            height: 100px;
-            border-radius: 12px;
-            object-fit: cover;
-            margin-bottom: 10px;
-            background: #1e293b;
-        }
-
-        .item-title {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 6px;
-            color: var(--text-main);
-        }
-
-        .item-price {
-            color: var(--accent);
-            font-weight: 700;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-
-        .btn {
-            background: var(--accent);
-            color: #ffffff;
-            border: none;
-            padding: 11px 14px;
-            border-radius: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            width: 100%;
-            font-size: 13px;
-            box-shadow: 0 4px 14px var(--accent-glow);
-            transition: all 0.2s;
-        }
-
-        .btn:active { transform: scale(0.98); opacity: 0.9; }
-
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-main);
-            box-shadow: none;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
-        }
-
-        .balance-box {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 22px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .balances span {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--accent);
-            display: block;
-            margin-top: 6px;
-        }
-
-        .nav-bar {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: rgba(19, 27, 46, 0.95);
-            backdrop-filter: blur(12px);
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: space-around;
-            padding: 10px 0 16px 0;
-            z-index: 100;
-            max-width: 480px;
-            margin: 0 auto;
-        }
-
-        .nav-item {
-            background: none; border: none;
-            color: var(--text-muted);
-            font-size: 11px;
-            font-weight: 500;
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            cursor: pointer;
-            gap: 5px;
-            flex: 1;
         }
 
-        .nav-item.active { color: var(--accent); }
-        .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(11, 15, 25, 0.85);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            backdrop-filter: blur(6px);
+        .stats-title {
+            font-size: 15px;
+            color: var(--hint-color);
         }
 
-        .modal-content {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            padding: 24px;
-            border-radius: 20px;
-            width: 100%;
-            max-width: 340px;
-            text-align: center;
+        .stats-value {
+            font-size: 18px;
+            font-weight: bold;
         }
 
-        .modal-content input {
-            width: 100%;
-            padding: 12px 14px;
-            background: var(--bg-color);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: white;
-            margin: 10px 0;
-            font-size: 14px;
-            text-align: center;
-            outline: none;
+        .history-section {
+            margin-top: 24px;
         }
 
-        .history-list {
-            max-height: 160px;
-            overflow-y: auto;
-            margin-top: 8px;
-            text-align: left;
-            padding-right: 4px;
+        .history-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
         }
 
         .history-item {
-            font-size: 12px;
-            color: var(--text-muted);
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            font-size: 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .gallery-item {
-            position: relative;
-            border-radius: 12px;
-            overflow: hidden;
-            background: var(--bg-color);
-            aspect-ratio: 1;
-            border: 1px solid var(--border);
-        }
-
-        .gallery-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+        .empty-history {
+            text-align: center;
+            color: var(--hint-color);
+            margin-top: 30px;
         }
     </style>
 </head>
 <body>
-
-<div class="container">
-    
-    <!-- 1. BOSH SAHIFA -->
-    <div id="view-home" class="view active">
-        <div class="header">
-            <div class="logo-title">PICTURE UZ</div>
-            <div class="status-badge">⭐ Stars & Gifts</div>
+    <div class="container">
+        <h2>📊 Foydalanuvchi Statistikasi</h2>
+        
+        <div class="stats-card">
+            <span class="stats-title">Foydalanuvchi ID:</span>
+            <span class="stats-value" id="user-id">-</span>
         </div>
 
-        <div class="balance-box">
-            <div class="section-title" style="margin-bottom: 4px;">Asosiy Hisob</div>
-            <div class="balances">
-                <span id="user-balance">0 so'm</span>
+        <div class="stats-card">
+            <span class="stats-title">Ism va familiya:</span>
+            <span class="stats-value" id="user-name">-</span>
+        </div>
+
+        <div class="stats-card">
+            <span class="stats-title">Jami generatsiyalar:</span>
+            <span class="stats-value" id="total-gens">0 ta</span>
+        </div>
+
+        <div class="stats-card">
+            <span class="stats-title">Botdagi balans:</span>
+            <span class="stats-value" id="user-balance">0 so'm</span>
+        </div>
+
+        <div class="history-section">
+            <div class="history-title">🕒 Yaratilgan ishlar tarixi</div>
+            <div id="history-list">
+                <div class="empty-history">Hozircha tarix bo'sh</div>
             </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">Hisobni to'ldirish uchun botga qayting</p>
-        </div>
-
-        <div class="section-title">AI Rasm Generatori</div>
-        <div style="background: var(--card-bg); padding: 18px; border-radius: 20px; border: 1px solid var(--border); text-align: center;">
-            <input type="text" id="ai-prompt" placeholder="Rasmni tavsiflang..." style="width:100%; padding:12px 14px; background:var(--bg-color); border:1px solid var(--border); border-radius:12px; color:#fff; margin-bottom:12px; font-size:14px; outline:none;">
-            <button class="btn" onclick="generateImage()">✨ Rasm yaratish (2,000 so'm)</button>
         </div>
     </div>
 
-    <!-- 2. SHOP SAHIFASI (STARS & GIFTS) -->
-    <div id="view-shop" class="view">
-        <div class="header">
-            <div class="logo-title">SHOP 🛒</div>
-            <div class="status-badge">Stars & Gifts</div>
-        </div>
-        <div class="section-title" style="margin-bottom: 8px;">Telegram Stars & Sovg'alar</div>
-        <div class="grid" id="shop-grid"></div>
-    </div>
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
-    <!-- 3. AUKSION -->
-    <div id="view-auction" class="view">
-        <div class="header">
-            <div class="logo-title">AUKSION 🔨</div>
-            <div class="status-badge">Bozor</div>
-        </div>
-        <button class="btn" style="margin-bottom: 16px;" onclick="openModal('add-auction-modal')">+ Mahsulotni auksionga qo'yish</button>
-        <div class="grid" id="auction-grid"></div>
-    </div>
+        // Telegram orqali kelgan foydalanuvchi ma'lumotlarini chiqarish
+        const user = tg.initDataUnsafe?.user;
 
-    <!-- 4. PROFIL -->
-    <div id="view-profile" class="view">
-        <div class="profile-card">
-            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" class="avatar" id="user-avatar" alt="Avatar">
-            <div class="username" id="profile-name">Foydalanuvchi</div>
-            <div class="user-id" id="profile-id">ID: 8694110588</div>
-        </div>
-
-        <div class="section-title">Tranzaksiyalar tarixi</div>
-        <div style="background: var(--card-bg); padding: 14px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 20px;">
-            <div class="history-list" id="transaction-history"></div>
-        </div>
-
-        <div class="section-title">Mening yaratgan rasmlarim 🎨</div>
-        <div class="gallery-grid" id="user-gallery"></div>
-    </div>
-
-    <!-- 5. ADMIN PANEL -->
-    <div id="view-admin" class="view">
-        <div class="header">
-            <div class="logo-title">ADMIN PANEL</div>
-            <div class="status-badge" style="background: rgba(245, 158, 11, 0.1); color: var(--warning); border-color: rgba(245, 158, 11, 0.3);">ID: 8694110588</div>
-        </div>
-        
-        <div style="background: var(--card-bg); padding: 18px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 16px;">
-            <div class="section-title" style="margin-bottom: 12px;">Shop Narxlarini Tahrirlash (Stars & Gifts)</div>
-            <div id="admin-shop-editor"></div>
-        </div>
-        
-        <div style="background: var(--card-bg); padding: 18px; border-radius: 20px; border: 1px solid var(--border);">
-            <div class="section-title" style="margin-bottom: 12px;">Xavfsizlik</div>
-            <button class="btn btn-danger" onclick="resetSystemData()">Barcha ma'lumotlarni tozalash</button>
-        </div>
-    </div>
-
-</div>
-
-<!-- Auksionga mahsulot qo'shish Modali -->
-<div class="modal" id="add-auction-modal">
-    <div class="modal-content">
-        <h3 style="margin-bottom: 6px; font-size: 16px;">Auksionga chiqarish</h3>
-        <input type="text" id="auction-item-title" placeholder="Mahsulot nomi">
-        <input type="number" id="auction-item-price" placeholder="Narxi (so'm)">
-        <button class="btn" onclick="addAuctionItem()">Qo'shish</button>
-        <button class="btn btn-outline" style="margin-top: 10px;" onclick="closeModal('add-auction-modal')">Yopish</button>
-    </div>
-</div>
-
-<!-- Navigation Bar -->
-<nav class="nav-bar">
-    <button class="nav-item active" onclick="switchView('home', this)">
-        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-        Asosiy
-    </button>
-    <button class="nav-item" onclick="switchView('shop', this)">
-        <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.60 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
-        Shop
-    </button>
-    <button class="nav-item" onclick="switchView('auction', this)">
-        <svg viewBox="0 0 24 24"><path d="M21 10h-8.35L17.8 4.5l-1.4-1.4L11 8.35V2h-2v6.35L4.6 3.1 3.2 4.5 8.65 10H0v2h24v-2zM2 20h20v-6H2v6z"/></svg>
-        Auksion
-    </button>
-    <button class="nav-item" onclick="switchView('profile', this)">
-        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-        Profil
-    </button>
-    <button class="nav-item" onclick="switchView('admin', this)" style="color: var(--warning);" id="admin-nav-btn">
-        <svg viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.03 2.18 13.84 2 13.6 2h-4c-.24 0-.43.18-.47.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.23.42.47.42h4c.24 0 .43-.18.47-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
-        Admin
-    </button>
-</nav>
-
-<script>
-    let tg = window.Telegram.WebApp;
-    tg.expand();
-
-    const ADMIN_ID = 8694110588;
-    let user = tg.initDataUnsafe?.user;
-    let currentUserId = user ? user.id : ADMIN_ID;
-
-    if (currentUserId !== ADMIN_ID) {
-        document.getElementById('admin-nav-btn').style.display = 'none';
-    }
-
-    let userData = JSON.parse(localStorage.getItem('picture_uz_v5_user_' + currentUserId)) || { balance: 1000 }; // Sinov uchun 1000 so'm qo'yildi
-    let userGallery = JSON.parse(localStorage.getItem('picture_uz_v5_gallery_' + currentUserId)) || [];
-    let transactionHistory = JSON.parse(localStorage.getItem('picture_uz_v5_history_' + currentUserId)) || [];
-    
-    let shopItems = JSON.parse(localStorage.getItem('picture_uz_v5_shop')) || [
-        { id: 1, title: '⭐ 50 Telegram Stars', price: 15000, priceText: '15,000 so\'m' },
-        { id: 2, title: '⭐ 100 Telegram Stars', price: 29000, priceText: '29,000 so\'m' },
-        { id: 3, title: '🎁 Telegram Gift (Rose)', price: 12000, priceText: '12,000 so\'m' },
-        { id: 4, title: '🎁 Telegram Gift (Box)', price: 25000, priceText: '25,000 so\'m' }
-    ];
-    let auctionItems = JSON.parse(localStorage.getItem('picture_uz_v5_auction')) || [];
-
-    function updateUI() {
-        document.getElementById('user-balance').innerText = userData.balance.toLocaleString() + " so'm";
         if (user) {
-            document.getElementById('profile-name').innerText = user.first_name || "Foydalanuvchi";
-            document.getElementById('profile-id').innerText = "ID: " + currentUserId;
-            if (user.photo_url) document.getElementById('user-avatar').src = user.photo_url;
+            document.getElementById('user-id').innerText = user.id;
+            document.getElementById('user-name').innerText = user.first_name + (user.last_name ? ' ' + user.last_name : '');
+            
+            // Mahalliy xotiradan (localStorage) yoki botdan kelgan ma'lumotni ko'rsatish
+            const savedGens = localStorage.getItem(`gens_${user.id}`) || '0';
+            document.getElementById('total-gens').innerText = savedGens + ' ta';
+
+            const savedBalance = localStorage.getItem(`balance_${user.id}`) || '0';
+            document.getElementById('user-balance').innerText = savedBalance + " so'm";
+
+            // Yaratilgan narslar tarixi (agar saqlangan bo'lsa)
+            const historyData = JSON.parse(localStorage.getItem(`history_${user.id}`) || '[]');
+            const historyListEl = document.getElementById('history-list');
+
+            if (historyData.length > 0) {
+                historyListEl.innerHTML = '';
+                historyData.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'history-item';
+                    div.innerHTML = `<span>🎨 ${item.prompt}</span><span style="color: var(--hint-color); font-size: 12px;">${item.date}</span>`;
+                    historyListEl.appendChild(div);
+                });
+            }
         } else {
-            document.getElementById('profile-id').innerText = "ID: " + ADMIN_ID;
+            // Test uchun agar brauzerda ochilsa
+            document.getElementById('user-name').innerText = "Mehmon (Telegram'dan oching)";
         }
-        
-        localStorage.setItem('picture_uz_v5_user_' + currentUserId, JSON.stringify(userData));
-        localStorage.setItem('picture_uz_v5_shop', JSON.stringify(shopItems));
-        localStorage.setItem('picture_uz_v5_gallery_' + currentUserId, JSON.stringify(userGallery));
-        localStorage.setItem('picture_uz_v5_history_' + currentUserId, JSON.stringify(transactionHistory));
-        localStorage.setItem('picture_uz_v5_auction', JSON.stringify(auctionItems));
-        
-        renderShop();
-        renderAuction();
-        renderAdminEditor();
-        renderGallery();
-        renderHistory();
-    }
-
-    function switchView(viewName, element) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        document.getElementById('view-' + viewName).classList.add('active');
-        element.classList.add('active');
-    }
-
-    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-    function addHistory(text, amount) {
-        transactionHistory.unshift({ text, amount, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) });
-        if (transactionHistory.length > 20) transactionHistory.pop();
-    }
-
-    function renderShop() {
-        let grid = document.getElementById('shop-grid');
-        grid.innerHTML = '';
-        shopItems.forEach((item, index) => {
-            grid.innerHTML += `
-                <div class="item-card">
-                    <div>
-                        <div class="item-title">${item.title}</div>
-                        <div class="item-price">${item.priceText}</div>
-                    </div>
-                    <button class="btn" onclick="buyShopItem(${index})">Sotib olish</button>
-                </div>
-            `;
-        });
-    }
-
-    function buyShopItem(index) {
-        let item = shopItems[index];
-        if (userData.balance < item.price) { alert("Balansingizda mablag' yetarli emas! Bot orqali hisobni to'ldiring."); return; }
-        userData.balance -= item.price;
-        addHistory("Xarid: " + item.title, "-" + item.price.toLocaleString() + " so'm");
-        updateUI();
-        alert(`🎉 "${item.title}" muvaffaqiyatli xarid qilindi!`);
-    }
-
-    function renderAuction() {
-        let grid = document.getElementById('auction-grid');
-        grid.innerHTML = '';
-        if(auctionItems.length === 0) {
-            grid.innerHTML = '<p style="color:var(--text-muted); font-size:12px; grid-column: span 2; text-align:center; padding: 20px;">Auksionda mahsulotlar yo\'q</p>';
-            return;
-        }
-        auctionItems.forEach((item, index) => {
-            grid.innerHTML += `
-                <div class="item-card">
-                    <div>
-                        <img src="${item.img}" alt="Item">
-                        <div class="item-title">${item.title}</div>
-                        <div class="item-price">${item.price.toLocaleString()} so'm</div>
-                    </div>
-                    <button class="btn" onclick="buyAuctionItem(${index})">Xarid qilish</button>
-                </div>
-            `;
-        });
-    }
-
-    function addAuctionItem() {
-        let title = document.getElementById('auction-item-title').value;
-        let price = Number(document.getElementById('auction-item-price').value);
-        if (!title || !price) { alert("Barcha maydonlarni to'ldiring!"); return; }
-
-        auctionItems.push({
-            id: Date.now(),
-            title: title,
-            price: price,
-            img: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=300"
-        });
-        updateUI();
-        closeModal('add-auction-modal');
-        document.getElementById('auction-item-title').value = '';
-        document.getElementById('auction-item-price').value = '';
-        alert("✅ Mahsulot auksionga qo'shildi!");
-    }
-
-    function buyAuctionItem(index) {
-        let item = auctionItems[index];
-        if (userData.balance < item.price) { alert("Balansingizda mablag' yetarli emas!"); return; }
-        userData.balance -= item.price;
-        addHistory("Auksion xarid: " + item.title, "-" + item.price.toLocaleString() + " so'm");
-        auctionItems.splice(index, 1);
-        updateUI();
-        alert("🎉 Auksiondan mahsulotni muvaffaqiyatli sotib oldingiz!");
-    }
-
-    function renderAdminEditor() {
-        let container = document.getElementById('admin-shop-editor');
-        container.innerHTML = '';
-        shopItems.forEach((item, index) => {
-            container.innerHTML += `
-                <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
-                    <input type="text" id="admin-title-${index}" value="${item.title}" style="margin:0; padding:8px 10px; font-size:12px; background:var(--bg-color); border:1px solid var(--border); border-radius:8px; color:#fff; flex:1; outline:none;">
-                    <input type="number" id="admin-price-num-${index}" value="${item.price}" style="margin:0; padding:8px 10px; width:100px; font-size:12px; background:var(--bg-color); border:1px solid var(--border); border-radius:8px; color:#fff; outline:none;" placeholder="Narx">
-                    <button class="btn" style="width:auto; padding:8px 12px; margin:0; font-size:12px;" onclick="saveShopItem(${index})">Saqlash</button>
-                </div>
-            `;
-        });
-    }
-
-    function saveShopItem(index) {
-        shopItems[index].title = document.getElementById(`admin-title-${index}`).value;
-        shopItems[index].price = Number(document.getElementById(`admin-price-num-${index}`).value);
-        shopItems[index].priceText = shopItems[index].price.toLocaleString() + " so'm";
-        updateUI();
-        alert("✅ Shop mahsulot narxi yangilandi!");
-    }
-
-    function generateImage() {
-        let prompt = document.getElementById('ai-prompt').value;
-        if (!prompt) { alert("Iltimos, rasm uchun tavsif yozing!"); return; }
-        if (userData.balance < 2000) { alert("Balansingizda mablag' yetarli emas! (Rasm narxi: 2,000 so'm)"); return; }
-        userData.balance -= 2000;
-        addHistory("AI Rasm yaratish", "-2,000 so'm");
-        
-        let sampleImages = [
-            "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=300",
-            "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=300",
-            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300"
-        ];
-        userGallery.unshift({ url: sampleImages[Math.floor(Math.random() * sampleImages.length)] });
-        updateUI();
-        alert("✨ Rasm muvaffaqiyatli yaratildi va galereyangizga qo'shildi!");
-        document.getElementById('ai-prompt').value = '';
-    }
-
-    function renderGallery() {
-        let galleryEl = document.getElementById('user-gallery');
-        galleryEl.innerHTML = '';
-        if(userGallery.length === 0) {
-            galleryEl.innerHTML = '<p style="color:var(--text-muted); font-size:12px; grid-column: span 3; text-align:center; padding: 15px;">Rasmlar hali yo\'q</p>';
-            return;
-        }
-        userGallery.forEach(img => {
-            galleryEl.innerHTML += `<div class="gallery-item"><img src="${img.url}"></div>`;
-        });
-    }
-
-    function renderHistory() {
-        let historyEl = document.getElementById('transaction-history');
-        historyEl.innerHTML = '';
-        if(transactionHistory.length === 0) {
-            historyEl.innerHTML = '<p style="color:var(--text-muted); font-size:12px; text-align:center; padding: 10px;">Tranzaksiyalar tarixi bo\'sh</p>';
-            return;
-        }
-        transactionHistory.forEach(h => {
-            historyEl.innerHTML += `
-                <div class="history-item">
-                    <span>${h.text} <span style="font-size:10px; color:var(--text-muted);">(${h.time})</span></span>
-                    <strong style="color: ${h.amount.includes('+') ? 'var(--accent)' : 'var(--danger)'};">${h.amount}</strong>
-                </div>
-            `;
-        });
-    }
-
-    function resetSystemData() {
-        if (confirm("Barcha ma'lumotlarni o'chirishni xohlaysizmi?")) {
-            localStorage.clear();
-            location.reload();
-        }
-    }
-
-    updateUI();
-</script>
-
+    </script>
 </body>
 </html>
