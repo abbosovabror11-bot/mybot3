@@ -1,8 +1,9 @@
-pyTelegramBotAPI==4.23.0
+aiogram==3.17.0
 aiohttp
 aiosqlite
 Pillow
 Flask
+
 
 
 
