@@ -721,7 +721,12 @@ async def about_handler(message: types.Message):
 async def check_sub_handler(callback: types.CallbackQuery, bot: Bot):
     unsubscribed = await check_user_subscriptions(bot, callback.from_user.id)
     if not unsubscribed:
-        try: await callback.message.delete() except: pass
+                    try:
+                if callback.message:
+                    await callback.message.delete()
+            except Exception:
+                pass
+
         await callback.message.answer("✅ Obuna tasdiqlandi!", reply_markup=Keyboards.get_user_main())
     else:
         await callback.answer("❌ Hamma kanalga obuna bo'lmadingiz!", show_alert=True)
