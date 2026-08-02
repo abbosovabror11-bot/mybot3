@@ -49,7 +49,7 @@ def run_web_server():
 # 2. KONFIGURATSIYA
 # ==============================================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAENRvJL44yxjUSFhFDp5yg09zFp-_yzMQc")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8856867256:AAENRvJL44yxjUSFhFDp5ygO9zFp-_yzMQc")
 ADMINS_RAW = os.getenv("ADMINS", "8694110588")
 ADMINS = [int(admin_id) for admin_id in ADMINS_RAW.split(",") if admin_id.strip().isdigit()]
 
@@ -721,12 +721,11 @@ async def about_handler(message: types.Message):
 async def check_sub_handler(callback: types.CallbackQuery, bot: Bot):
     unsubscribed = await check_user_subscriptions(bot, callback.from_user.id)
     if not unsubscribed:
-                    try:
-                if callback.message:
-                    await callback.message.delete()
-            except Exception:
-                pass
-
+        try:
+            if callback.message:
+                await callback.message.delete()
+        except Exception:
+            pass
         await callback.message.answer("✅ Obuna tasdiqlandi!", reply_markup=Keyboards.get_user_main())
     else:
         await callback.answer("❌ Hamma kanalga obuna bo'lmadingiz!", show_alert=True)
